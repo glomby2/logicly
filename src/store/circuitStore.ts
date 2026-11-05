@@ -1,0 +1,230 @@
+import { createStore, type StoreApi } from 'zustand/vanilla';
+import {
+  addComponent,
+  carryInteractiveProps,
+  changedPropKeys,
+  classifyChange,
+  connect,
+  findComponent,
+  removeComponents,
+  removeWires,
+  updateComponentProps,
+  type CircuitChange,
+  type ConnectionCheck,
+} from '@/core/circuit';
+import type { ElementRegistry } from '@/core/elements';
+import {
+  EMPTY_CIRCUIT,
+  type Circuit,
+  type ComponentId,
+  type ElementProps,
+  type PinRef,
+  type Point,
+  type WireId,
+} from '@/core/types/circuit';
+import { createId as defaultCreateId } from '@/lib/id';
+import {
+  emptyHistory,
+  recordHistory,
+  redoHistory,
+  undoHistory,
+  type HistoryState,
+  type HistoryStep,
+} from './history';
+
+export interface ComponentMove {
+  readonly id: ComponentId;
+  readonly position: Point;
+}
+
+export interface RemoveItems {
+  readonly components?: Iterable<ComponentId>;
+  readonly wires?: Iterable<WireId>;
+}
+
+export interface CircuitStoreState {
+  /** Схема — то, что сохраняется в файл. Вычисленные сигналы здесь не хранятся. */
+  readonly circuit: Circuit;
+  /** Загрузка или очистка документа: симуляция начинается заново. */
+  readonly documentVersion: number;
+  /** Изменение топологии или набора пинов: нужна перекомпиляция netlist. */
+  readonly structureVersion: number;
+  /** Изменение свойств без смены пинов: достаточно `engine.setProps()`. */
+  readonly propsVersion: number;
+  readonly history: HistoryState<Circuit>;
+  /** Снимок на момент `beginBatch()`; пока группа открыта, история не пополняется. */
+  readonly batchStart: Circuit | null;
+
+  addComponent(type: string, position: Point, props?: ElementProps): ComponentId;
+  moveComponents(moves: readonly ComponentMove[]): void;
+  /** Пустая подпись удаляет её. */
+  renameComponent(id: ComponentId, label: string): void;
+  updateProps(id: ComponentId, patch: ElementProps): void;
+  /** Соединяет два пина в любом порядке. Возвращает результат проверки — UI может показать причину отказа. */
+  connect(a: PinRef, b: PinRef): ConnectionCheck;
+  remove(items: RemoveItems): void;
+  loadCircuit(circuit: Circuit): void;
+  clear(): void;
+  undo(): void;
+  redo(): void;
+  /** Группирует последующие изменения в один шаг истории (например, перетаскивание). */
+  beginBatch(): void;
+  endBatch(): void;
+}
+
+export type CircuitStore = StoreApi<CircuitStoreState>;
+
+export interface CircuitStoreOptions {
+  readonly registry: ElementRegistry;
+  readonly createId?: (prefix: string) => string;
+  readonly historyLimit?: number;
+}
+
+const versionBumps = (change: CircuitChange) => ({
+  structure: change === 'structure' ? 1 : 0,
+  props: change === 'props' ? 1 : 0,
+});
+
+export function createCircuitStore({
+  registry,
+  createId = defaultCreateId,
+  historyLimit,
+}: CircuitStoreOptions): CircuitStore {
+  return createStore<CircuitStoreState>()((set, get) => {
+    /** Применяет новую схему, увеличивает нужные версии и при необходимости пишет историю. */
+    const commit = (next: Circuit, record = true) => {
+      const state = get();
+      if (next === state.circuit) return;
+      const bump = versionBumps(classifyChange(state.circuit, next, registry));
+      const writeHistory = record && state.batchStart === null;
+      set({
+        circuit: next,
+        structureVersion: state.structureVersion + bump.structure,
+        propsVersion: state.propsVersion + bump.props,
+        history: writeHistory ? recordHistory(state.history, state.circuit, historyLimit) : state.history,
+      });
+    };
+
+    const uniqueId = (prefix: string, taken: (id: string) => boolean) => {
+      let id: string;
+      do id = createId(prefix);
+      while (taken(id));
+      return id;
+    };
+
+    /** Переход по истории: интерактивные свойства берутся из текущей схемы. */
+    const travel = (step: HistoryStep<Circuit> | undefined) => {
+      const state = get();
+      if (!step || state.batchStart !== null) return;
+      const next = carryInteractiveProps(step.snapshot, state.circuit, registry);
+      const bump = versionBumps(classifyChange(state.circuit, next, registry));
+      set({
+        circuit: next,
+        history: step.history,
+        structureVersion: state.structureVersion + bump.structure,
+        propsVersion: state.propsVersion + bump.props,
+      });
+    };
+
+    const load = (circuit: Circuit) => {
+      const state = get();
+      set({
+        circuit,
+        documentVersion: state.documentVersion + 1,
+        structureVersion: state.structureVersion + 1,
+        history: emptyHistory(),
+        batchStart: null,
+      });
+    };
+
+    return {
+      circuit: EMPTY_CIRCUIT,
+      documentVersion: 0,
+      structureVersion: 0,
+      propsVersion: 0,
+      history: emptyHistory(),
+      batchStart: null,
+
+      addComponent(type, position, props = {}) {
+        const { circuit } = get();
+        const id = uniqueId(type.toLowerCase(), (candidate) => !!findComponent(circuit, candidate));
+        commit(addComponent(circuit, registry, { id, type, position, props }));
+        return id;
+      },
+
+      moveComponents(moves) {
+        const targets = new Map(moves.map((move) => [move.id, move.position]));
+        const { circuit } = get();
+        let moved = false;
+        const components = circuit.components.map((component) => {
+          const position = targets.get(component.id);
+          if (!position || (position.x === component.position.x && position.y === component.position.y)) {
+            return component;
+          }
+          moved = true;
+          return { ...component, position };
+        });
+        if (moved) commit({ ...circuit, components });
+      },
+
+      renameComponent(id, label) {
+        const { circuit } = get();
+        const component = findComponent(circuit, id);
+        const trimmed = label.trim();
+        if (!component || (component.label ?? '') === trimmed) return;
+        const renamed = { ...component, label: trimmed || undefined };
+        commit({ ...circuit, components: circuit.components.map((c) => (c.id === id ? renamed : c)) });
+      },
+
+      updateProps(id, patch) {
+        const { circuit } = get();
+        const component = findComponent(circuit, id);
+        if (!component) return;
+        const next = updateComponentProps(circuit, registry, id, patch);
+        const updated = findComponent(next, id)!;
+        const keys = changedPropKeys(component.props, updated.props);
+        if (keys.length === 0) return;
+        const interactive = registry.get(component.type)?.interactiveProps ?? [];
+        commit(next, !keys.every((key) => interactive.includes(key)));
+      },
+
+      connect(a, b) {
+        const { circuit } = get();
+        const wireId = uniqueId('w', (candidate) => circuit.wires.some((w) => w.id === candidate));
+        const result = connect(circuit, registry, a, b, wireId);
+        if (result.check.ok) commit(result.circuit);
+        return result.check;
+      },
+
+      remove({ components = [], wires = [] }) {
+        const { circuit } = get();
+        const next = removeWires(removeComponents(circuit, components), wires);
+        const unchanged =
+          next.components.length === circuit.components.length && next.wires.length === circuit.wires.length;
+        if (!unchanged) commit(next);
+      },
+
+      loadCircuit: load,
+      clear: () => load(EMPTY_CIRCUIT),
+
+      undo: () => travel(undoHistory(get().history, get().circuit)),
+      redo: () => travel(redoHistory(get().history, get().circuit)),
+
+      beginBatch() {
+        if (get().batchStart === null) set({ batchStart: get().circuit });
+      },
+
+      endBatch() {
+        const { batchStart, circuit, history } = get();
+        if (batchStart === null) return;
+        set({
+          batchStart: null,
+          history: batchStart === circuit ? history : recordHistory(history, batchStart, historyLimit),
+        });
+      },
+    };
+  });
+}
+
+export const selectCanUndo = (state: CircuitStoreState) => state.history.past.length > 0 && state.batchStart === null;
+export const selectCanRedo = (state: CircuitStoreState) => state.history.future.length > 0 && state.batchStart === null;

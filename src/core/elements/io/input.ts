@@ -12,6 +12,7 @@ export const INPUT: ElementDefinition<InputProps> = {
   description: 'Переключатель: подаёт на выход 0 или 1',
   category: 'io',
   defaultProps: { value: false },
+  interactiveProps: ['value'],
   pins: () => PINS,
   evaluate: ({ props }) => ({ outputs: [fromBoolean(props.value)] }),
 };

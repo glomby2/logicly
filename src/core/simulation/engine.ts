@@ -4,7 +4,7 @@ import { join } from '../logic/ops';
 import { UNKNOWN, type Signal } from '../logic/signal';
 import type { ComponentId, ElementProps, PinRef } from '../types/circuit';
 import type { EvalResult } from '../types/element';
-import type { NetId, Netlist } from './netlist';
+import { netIdOf, type NetId, type Netlist } from './netlist';
 import { RankQueue } from './rankQueue';
 
 export type SettleStatus = 'stable' | 'oscillation';
@@ -184,6 +184,25 @@ export class SimulationEngine {
     if (inputIndex < 0) return undefined;
     const net = component.inputNets[inputIndex];
     return net === null || net === undefined ? 0 : this.values[net];
+  }
+
+  /**
+   * Значения всех пинов, ключ — `componentId:pinId` (формат `netIdOf`).
+   * Для выходов совпадает с сетью, для входов — значение питающей сети или 0.
+   */
+  getPinSignals(): Record<string, Signal> {
+    const signals: Record<string, Signal> = {};
+    for (const component of this.netlist.components) {
+      const key = (pinId: string) => netIdOf({ componentId: component.id, pinId });
+      component.inputPins.forEach((pin, i) => {
+        const net = component.inputNets[i];
+        signals[key(pin.id)] = net === null || net === undefined ? 0 : this.values[net]!;
+      });
+      component.outputPins.forEach((pin, i) => {
+        signals[key(pin.id)] = this.values[component.outputNets[i]!]!;
+      });
+    }
+    return signals;
   }
 
   getSignals(): Record<NetId, Signal> {

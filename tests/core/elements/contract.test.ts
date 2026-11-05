@@ -50,6 +50,12 @@ describe.each(CHECKED_ELEMENTS.map((d) => [d.type, d] as const))('контрак
     expect(resolveProps(definition)).toEqual(definition.defaultProps);
   });
 
+  it('интерактивные свойства объявлены в defaultProps', () => {
+    for (const key of definition.interactiveProps ?? []) {
+      expect(definition.defaultProps).toHaveProperty(key);
+    }
+  });
+
   it('id пинов уникальны', () => {
     for (const props of propVariants(definition)) {
       const { inputs, outputs } = definition.pins(props);

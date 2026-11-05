@@ -47,6 +47,28 @@ export function updateComponentProps(
 }
 
 /**
+ * Переносит значения интерактивных свойств (`interactiveProps`) из `source` в `target`
+ * для элементов с совпадающими id и типом. Используется при undo/redo: отмена правки
+ * схемы не должна откатывать положения переключателей.
+ */
+export function carryInteractiveProps(target: Circuit, source: Circuit, registry: ElementRegistry): Circuit {
+  const sourceById = new Map(source.components.map((c) => [c.id, c]));
+  let changed = false;
+  const components = target.components.map((component) => {
+    const current = sourceById.get(component.id);
+    const keys = registry.get(component.type)?.interactiveProps ?? [];
+    if (!current || current.type !== component.type || keys.length === 0) return component;
+    const differing = keys.filter((key) => key in current.props && current.props[key] !== component.props[key]);
+    if (differing.length === 0) return component;
+    changed = true;
+    const props = { ...component.props };
+    for (const key of differing) props[key] = current.props[key]!;
+    return { ...component, props };
+  });
+  return changed ? { ...target, components } : target;
+}
+
+/**
  * Удаляет провода, нарушающие правила соединений: ссылающиеся на несуществующие пины,
  * направленные не от выхода к входу, а также лишние источники одного входа
  * (сохраняется первый провод).

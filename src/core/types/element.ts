@@ -72,6 +72,12 @@ export interface ElementDefinition<P extends ElementProps = ElementProps, S = un
   readonly category: ElementCategory;
   readonly defaultProps: P;
   readonly propSchema?: readonly PropSpec[];
+  /**
+   * Свойства, которые пользователь меняет при работе со схемой, а не при её редактировании
+   * (положение переключателя INPUT). Их изменения не попадают в историю undo/redo,
+   * а при отмене сохраняется их текущее значение.
+   */
+  readonly interactiveProps?: readonly string[];
   pins(props: P): ElementPins;
   initialState?(props: P): S;
   evaluate(context: EvalContext<P, S>): EvalResult<S>;
