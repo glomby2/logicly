@@ -13,6 +13,7 @@ export const INPUT: ElementDefinition<InputProps> = {
   category: 'io',
   defaultProps: { value: false },
   interactiveProps: ['value'],
+  labelPrefix: 'X',
   pins: () => PINS,
   evaluate: ({ props }) => ({ outputs: [fromBoolean(props.value)] }),
 };

@@ -2,7 +2,7 @@ export { createAppStores } from './appStores';
 export type { AppStores, AppStoresOptions } from './appStores';
 export { createCircuitStore, selectCanRedo, selectCanUndo } from './circuitStore';
 export type { CircuitStore, CircuitStoreState, ComponentMove, RemoveItems } from './circuitStore';
-export { createCommands } from './commands';
+export { createCommands, PASTE_OFFSET } from './commands';
 export type { AppCommands } from './commands';
 export { emptyHistory, HISTORY_LIMIT, recordHistory, redoHistory, undoHistory } from './history';
 export type { HistoryState, HistoryStep } from './history';

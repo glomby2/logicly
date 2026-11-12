@@ -1,16 +1,29 @@
-import { CircuitBoard } from 'lucide-react';
-import { ru } from '@/i18n/ru';
+import { ReactFlowProvider } from '@xyflow/react';
+import { useEffect } from 'react';
+import { Canvas } from '@/editor/Canvas';
+import { WIDE_SCREEN } from '@/editor/placement';
+import { Palette } from '@/features/palette/Palette';
+import { StatusBar } from '@/features/status/StatusBar';
+import { Toolbar } from '@/features/toolbar/Toolbar';
+import { appStores } from '@/store/hooks';
 
-/** Временная страница-заглушка до появления редактора. */
 export function App() {
+  useEffect(() => {
+    if (window.innerWidth < WIDE_SCREEN) appStores.ui.getState().setPanel('palette', false);
+  }, []);
+
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-slate-50 px-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="max-w-md text-center">
-        <CircuitBoard className="mx-auto mb-4 size-12 text-emerald-500" aria-hidden />
-        <h1 className="text-2xl font-semibold">{ru.app.title}</h1>
-        <p className="mt-2 text-slate-600 dark:text-slate-400">{ru.app.subtitle}</p>
-        <p className="mt-6 text-sm text-slate-500">{ru.app.placeholder}</p>
+    <ReactFlowProvider>
+      <div className="flex h-dvh flex-col bg-slate-950 text-slate-100">
+        <Toolbar />
+        <div className="relative flex min-h-0 flex-1">
+          <Palette />
+          <main className="relative min-w-0 flex-1">
+            <Canvas />
+          </main>
+        </div>
+        <StatusBar />
       </div>
-    </main>
+    </ReactFlowProvider>
   );
 }

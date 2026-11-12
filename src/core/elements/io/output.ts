@@ -11,6 +11,7 @@ export const OUTPUT: ElementDefinition<NoProps> = {
   description: 'Индикатор: светится, когда на входе 1',
   category: 'io',
   defaultProps: {},
+  labelPrefix: 'Y',
   pins: () => PINS,
   evaluate: () => ({ outputs: [] }),
 };

@@ -78,6 +78,8 @@ export interface ElementDefinition<P extends ElementProps = ElementProps, S = un
    * а при отмене сохраняется их текущее значение.
    */
   readonly interactiveProps?: readonly string[];
+  /** Префикс автоматической подписи нового экземпляра: `X` → X1, X2, … Без префикса подписи нет. */
+  readonly labelPrefix?: string;
   pins(props: P): ElementPins;
   initialState?(props: P): S;
   evaluate(context: EvalContext<P, S>): EvalResult<S>;

@@ -1,4 +1,7 @@
-export { connect, findWireToInput, isPinConnected, resolveConnection } from './connections';
+export { connect, findWireToInput, isPinConnected, reconnect, resolveConnection } from './connections';
+export { extractFragment, insertFragment, instantiateFragment } from './fragment';
+export type { CircuitFragment } from './fragment';
+export { nextLabel } from './labels';
 export type { ConnectionCheck, ConnectionError } from './connections';
 export { changedPropKeys, classifyChange } from './diff';
 export type { CircuitChange } from './diff';

@@ -6,10 +6,14 @@ import {
   classifyChange,
   connect,
   findComponent,
+  insertFragment,
+  instantiateFragment,
+  reconnect as reconnectWire,
   removeComponents,
   removeWires,
   updateComponentProps,
   type CircuitChange,
+  type CircuitFragment,
   type ConnectionCheck,
 } from '@/core/circuit';
 import type { ElementRegistry } from '@/core/elements';
@@ -55,13 +59,17 @@ export interface CircuitStoreState {
   /** Снимок на момент `beginBatch()`; пока группа открыта, история не пополняется. */
   readonly batchStart: Circuit | null;
 
-  addComponent(type: string, position: Point, props?: ElementProps): ComponentId;
+  addComponent(type: string, position: Point, props?: ElementProps, label?: string): ComponentId;
   moveComponents(moves: readonly ComponentMove[]): void;
   /** Пустая подпись удаляет её. */
   renameComponent(id: ComponentId, label: string): void;
   updateProps(id: ComponentId, patch: ElementProps): void;
   /** Соединяет два пина в любом порядке. Возвращает результат проверки — UI может показать причину отказа. */
   connect(a: PinRef, b: PinRef): ConnectionCheck;
+  /** Переподключает провод к другим пинам, сохраняя его id. Недопустимое соединение ничего не меняет. */
+  reconnect(wireId: WireId, a: PinRef, b: PinRef): ConnectionCheck;
+  /** Вставляет копию фрагмента с новыми id и смещением — одним шагом истории. Возвращает вставленное. */
+  insertFragment(fragment: CircuitFragment, offset: Point): CircuitFragment;
   remove(items: RemoveItems): void;
   loadCircuit(circuit: Circuit): void;
   clear(): void;
@@ -145,10 +153,10 @@ export function createCircuitStore({
       history: emptyHistory(),
       batchStart: null,
 
-      addComponent(type, position, props = {}) {
+      addComponent(type, position, props = {}, label) {
         const { circuit } = get();
         const id = uniqueId(type.toLowerCase(), (candidate) => !!findComponent(circuit, candidate));
-        commit(addComponent(circuit, registry, { id, type, position, props }));
+        commit(addComponent(circuit, registry, { id, type, position, props, ...(label ? { label } : {}) }));
         return id;
       },
 
@@ -194,6 +202,30 @@ export function createCircuitStore({
         const result = connect(circuit, registry, a, b, wireId);
         if (result.check.ok) commit(result.circuit);
         return result.check;
+      },
+
+      reconnect(wireId, a, b) {
+        const result = reconnectWire(get().circuit, registry, wireId, a, b);
+        if (result.check.ok) commit(result.circuit);
+        return result.check;
+      },
+
+      insertFragment(fragment, offset) {
+        const { circuit } = get();
+        const taken = new Set([...circuit.components.map((c) => c.id), ...circuit.wires.map((w) => w.id)]);
+        const fresh = instantiateFragment(
+          fragment,
+          (prefix) => {
+            const id = uniqueId(prefix, (candidate) => taken.has(candidate));
+            taken.add(id);
+            return id;
+          },
+          offset,
+        );
+        const next = insertFragment(circuit, registry, fresh);
+        commit(next);
+        const insertedWires = new Set(next.wires.map((w) => w.id));
+        return { components: fresh.components, wires: fresh.wires.filter((w) => insertedWires.has(w.id)) };
       },
 
       remove({ components = [], wires = [] }) {

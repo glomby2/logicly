@@ -44,7 +44,7 @@ export function createAppStores({
     simulation,
     ui,
     simulationControl,
-    commands: createCommands({ circuit, ui }),
+    commands: createCommands({ circuit, ui, registry }),
     dispose() {
       simulationControl.dispose();
       unsubscribeSelection();

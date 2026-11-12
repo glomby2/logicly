@@ -1,4 +1,5 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
+import type { CircuitFragment } from '@/core/circuit';
 import type { Circuit, ComponentId, WireId } from '@/core/types/circuit';
 
 export interface Selection {
@@ -17,6 +18,9 @@ export interface UiStoreState {
   readonly dialog: DialogId | null;
   /** Тип элемента, выбранного в палитре для размещения тапом по полю (тач-устройства). */
   readonly placement: string | null;
+  /** Скопированный фрагмент схемы и число вставок из него (для смещения каждой следующей копии). */
+  readonly clipboard: CircuitFragment | null;
+  readonly pasteCount: number;
 
   select(selection: Partial<Selection>): void;
   clearSelection(): void;
@@ -29,6 +33,9 @@ export interface UiStoreState {
   closeDialog(): void;
   startPlacement(type: string): void;
   cancelPlacement(): void;
+  setClipboard(fragment: CircuitFragment): void;
+  /** Увеличивает счётчик вставок и возвращает его новое значение. */
+  notePaste(): number;
 }
 
 export type UiStore = StoreApi<UiStoreState>;
@@ -42,6 +49,8 @@ export function createUiStore(): UiStore {
     theme: 'system',
     dialog: null,
     placement: null,
+    clipboard: null,
+    pasteCount: 0,
 
     select: ({ components = [], wires = [] }) => set({ selection: { components, wires } }),
 
@@ -68,6 +77,12 @@ export function createUiStore(): UiStore {
     closeDialog: () => set({ dialog: null }),
     startPlacement: (type) => set({ placement: type }),
     cancelPlacement: () => set({ placement: null }),
+    setClipboard: (fragment) => set({ clipboard: fragment, pasteCount: 0 }),
+    notePaste() {
+      const pasteCount = get().pasteCount + 1;
+      set({ pasteCount });
+      return pasteCount;
+    },
   }));
 }
 

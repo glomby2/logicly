@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connect, findWireToInput, isPinConnected, resolveConnection } from '@/core/circuit';
+import { connect, findWireToInput, isPinConnected, reconnect, resolveConnection } from '@/core/circuit';
 import { createDefaultRegistry } from '@/core/elements';
 import { CircuitBuilder } from '../../helpers/circuitBuilder';
 
@@ -100,6 +100,31 @@ describe('connect', () => {
   it('запрещает повторное использование id провода', () => {
     const circuit = connect(base(), registry, ref('A', 'out0'), ref('G', 'in0'), 'w1').circuit;
     expect(() => connect(circuit, registry, ref('B', 'out0'), ref('G', 'in1'), 'w1')).toThrow(/уже существует/);
+  });
+});
+
+describe('reconnect', () => {
+  const wired = () =>
+    new CircuitBuilder().input('A').input('B').gate('G', 'AND').wire('A', 'G.in0').build();
+
+  it('переносит конец провода на другой пин, сохраняя id', () => {
+    const { circuit, check } = reconnect(wired(), registry, 'w1', ref('B', 'out0'), ref('G', 'in0'));
+    expect(check.ok).toBe(true);
+    expect(circuit.wires).toEqual([{ id: 'w1', from: ref('B', 'out0'), to: ref('G', 'in0') }]);
+  });
+
+  it('нормализует направление', () => {
+    const { circuit } = reconnect(wired(), registry, 'w1', ref('G', 'in1'), ref('A', 'out0'));
+    expect(circuit.wires).toEqual([{ id: 'w1', from: ref('A', 'out0'), to: ref('G', 'in1') }]);
+  });
+
+  it('недопустимое соединение и прежние концы не меняют схему', () => {
+    const original = wired();
+    expect(reconnect(original, registry, 'w1', ref('A', 'out0'), ref('B', 'out0')).circuit).toBe(original);
+    const same = reconnect(original, registry, 'w1', ref('G', 'in0'), ref('A', 'out0'));
+    expect(same.check.ok).toBe(true);
+    expect(same.circuit).toBe(original);
+    expect(reconnect(original, registry, 'missing', ref('A', 'out0'), ref('G', 'in1')).check.ok).toBe(false);
   });
 });
 
