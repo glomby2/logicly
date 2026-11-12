@@ -1,3 +1,4 @@
+import type { ConnectionError } from '@/core/circuit';
 import type { ElementCategory } from '@/core/types/element';
 
 /** Строки интерфейса. Названия логических элементов (AND, OR, …) сюда не входят — они международные. */
@@ -46,6 +47,97 @@ export const ru = {
   node: {
     toggleInput: 'Переключить вход',
   },
+  inspector: {
+    title: 'Свойства',
+    toggle: 'Показать или скрыть свойства',
+    close: 'Закрыть',
+    label: 'Подпись',
+    value: 'Значение',
+    properties: 'Параметры',
+    pins: 'Выводы',
+    input: (index: number) => `Вход ${index + 1}`,
+    output: (index: number) => `Выход ${index + 1}`,
+    notConnected: 'не подключён',
+    wire: 'Провод',
+    from: 'Откуда',
+    to: 'Куда',
+    signal: 'Сигнал',
+    selected: 'Выделено',
+    elements: 'Элементов',
+    wires: 'Проводов',
+    circuit: 'Схема',
+    noIssues: 'Проблем не найдено',
+    issues: 'Требует внимания',
+    issueFloating: 'Вход не подключён (читается как 0)',
+    issueUnknown: 'Неопределённый сигнал X',
+    show: 'Показать на поле',
+    copy: 'Копировать',
+    duplicate: 'Дублировать',
+    delete: 'Удалить',
+    empty: 'Схема пуста. Добавьте элементы из палитры.',
+  },
+  placement: {
+    hint: (title: string) => `Коснитесь поля, чтобы поставить ${title}`,
+    cancel: 'Отмена',
+  },
+  help: {
+    open: 'Горячие клавиши (F1)',
+    title: 'Горячие клавиши',
+    close: 'Закрыть',
+    groups: [
+      {
+        title: 'Правка',
+        items: [
+          ['Ctrl+Z', 'Отменить'],
+          ['Ctrl+Y, Ctrl+Shift+Z', 'Повторить'],
+          ['Ctrl+C', 'Копировать'],
+          ['Ctrl+X', 'Вырезать'],
+          ['Ctrl+V', 'Вставить'],
+          ['Ctrl+D', 'Дублировать'],
+          ['Delete, Backspace', 'Удалить выделенное'],
+        ],
+      },
+      {
+        title: 'Выделение и перемещение',
+        items: [
+          ['Ctrl+A', 'Выделить всё'],
+          ['Shift+клик', 'Добавить к выделению'],
+          ['Shift+перетаскивание', 'Выделить рамкой'],
+          ['Стрелки', 'Сдвинуть выделенное на шаг сетки'],
+          ['Shift+стрелки', 'Сдвинуть на 5 шагов'],
+          ['Esc', 'Снять выделение, закрыть меню'],
+        ],
+      },
+      {
+        title: 'Поле',
+        items: [
+          ['Колёсико', 'Масштаб'],
+          ['Перетаскивание поля', 'Перемещение по полю'],
+          ['Правый клик', 'Контекстное меню'],
+          ['F1, ?', 'Эта справка'],
+        ],
+      },
+    ],
+  },
+  simulation: {
+    start: 'Запустить',
+    pause: 'Пауза',
+    step: 'Шаг',
+    reset: 'Сброс: вернуть симуляцию в начальное состояние',
+    frequency: 'Частота шагов',
+    hertz: (value: number) => `${value} Гц`,
+    time: (value: number) => `t = ${value}`,
+  },
+  notifications: {
+    region: 'Уведомления',
+    dismiss: 'Закрыть уведомление',
+    wireReplaced: 'Вход уже был занят — старый провод заменён новым',
+    connection: {
+      'same-direction': 'Провод соединяет выход со входом: два выхода или два входа соединить нельзя',
+      duplicate: 'Эти пины уже соединены',
+      'unknown-pin': 'Не удалось найти пин для соединения',
+    } satisfies Record<ConnectionError, string>,
+  },
   status: {
     components: 'Элементов',
     wires: 'Проводов',
@@ -53,6 +145,6 @@ export const ru = {
     oscillation: 'Колебания',
     unknown: (count: number) => `Неопределённых сигналов (X): ${count}`,
     floating: (count: number) => `Неподключённых входов: ${count}`,
-    empty: 'Перетащите элементы из палитры на поле',
+    empty: 'Добавьте элементы из палитры',
   },
 } as const;

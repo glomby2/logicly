@@ -1,6 +1,7 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { CircuitFragment } from '@/core/circuit';
 import type { Circuit, ComponentId, WireId } from '@/core/types/circuit';
+import { pushNotification, type AppNotification, type NotificationTone } from './notifications';
 
 export interface Selection {
   readonly components: readonly ComponentId[];
@@ -9,7 +10,7 @@ export interface Selection {
 
 export type PanelId = 'palette' | 'inspector';
 export type ThemePreference = 'system' | 'light' | 'dark';
-export type DialogId = 'truth-table';
+export type DialogId = 'shortcuts' | 'truth-table';
 
 export interface UiStoreState {
   readonly selection: Selection;
@@ -21,6 +22,8 @@ export interface UiStoreState {
   /** Скопированный фрагмент схемы и число вставок из него (для смещения каждой следующей копии). */
   readonly clipboard: CircuitFragment | null;
   readonly pasteCount: number;
+  /** Ограниченная очередь уведомлений без повторов. */
+  readonly notifications: readonly AppNotification[];
 
   select(selection: Partial<Selection>): void;
   clearSelection(): void;
@@ -36,6 +39,8 @@ export interface UiStoreState {
   setClipboard(fragment: CircuitFragment): void;
   /** Увеличивает счётчик вставок и возвращает его новое значение. */
   notePaste(): number;
+  notify(message: string, tone?: NotificationTone): void;
+  dismissNotification(id: number): void;
 }
 
 export type UiStore = StoreApi<UiStoreState>;
@@ -43,6 +48,7 @@ export type UiStore = StoreApi<UiStoreState>;
 export const EMPTY_SELECTION: Selection = { components: [], wires: [] };
 
 export function createUiStore(): UiStore {
+  let nextNotificationId = 1;
   return createStore<UiStoreState>()((set, get) => ({
     selection: EMPTY_SELECTION,
     panels: { palette: true, inspector: true },
@@ -51,6 +57,7 @@ export function createUiStore(): UiStore {
     placement: null,
     clipboard: null,
     pasteCount: 0,
+    notifications: [],
 
     select: ({ components = [], wires = [] }) => set({ selection: { components, wires } }),
 
@@ -82,6 +89,13 @@ export function createUiStore(): UiStore {
       const pasteCount = get().pasteCount + 1;
       set({ pasteCount });
       return pasteCount;
+    },
+    notify(message, tone = 'info') {
+      set({ notifications: pushNotification(get().notifications, message, tone, nextNotificationId++) });
+    },
+    dismissNotification(id) {
+      const notifications = get().notifications.filter((n) => n.id !== id);
+      if (notifications.length !== get().notifications.length) set({ notifications });
     },
   }));
 }

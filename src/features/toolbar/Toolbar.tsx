@@ -1,5 +1,17 @@
-import { CircuitBoard, ClipboardPaste, Copy, Eraser, PanelLeft, Redo2, Trash2, Undo2 } from 'lucide-react';
+import {
+  CircleHelp,
+  CircuitBoard,
+  ClipboardPaste,
+  Copy,
+  Eraser,
+  PanelLeft,
+  PanelRight,
+  Redo2,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
+import { SimulationControls } from '@/features/simulation/SimulationControls';
 import { Separator } from '@/components/ui/Separator';
 import { ru } from '@/i18n/ru';
 import { selectCanRedo, selectCanUndo } from '@/store';
@@ -14,9 +26,10 @@ export function Toolbar() {
   const hasSelection = useUiStore((s) => s.selection.components.length + s.selection.wires.length > 0);
   const canPaste = useUiStore((s) => s.clipboard !== null);
   const paletteOpen = useUiStore((s) => s.panels.palette);
+  const inspectorOpen = useUiStore((s) => s.panels.inspector);
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-1 border-b border-slate-800 bg-slate-900 px-2">
+    <header className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-800 bg-slate-900 px-2">
       <IconButton
         label={ru.toolbar.togglePalette}
         icon={PanelLeft}
@@ -26,17 +39,36 @@ export function Toolbar() {
       />
       <div className="mr-2 flex items-center gap-2 pl-1">
         <CircuitBoard className="size-5 text-emerald-400" aria-hidden />
-        <h1 className="hidden text-sm font-semibold text-slate-100 sm:block">{ru.app.title}</h1>
+        <h1 className="hidden text-sm font-semibold text-slate-100 lg:block">{ru.app.title}</h1>
       </div>
       <Separator vertical />
       <IconButton label={`${ru.toolbar.undo} (Ctrl+Z)`} icon={Undo2} disabled={!canUndo} onClick={() => circuit.getState().undo()} data-testid="undo" />
       <IconButton label={`${ru.toolbar.redo} (Ctrl+Y)`} icon={Redo2} disabled={!canRedo} onClick={() => circuit.getState().redo()} data-testid="redo" />
       <Separator vertical />
-      <IconButton label={`${ru.toolbar.copy} (Ctrl+C)`} icon={Copy} disabled={!hasSelection} onClick={() => commands.copySelection()} />
-      <IconButton label={`${ru.toolbar.paste} (Ctrl+V)`} icon={ClipboardPaste} disabled={!canPaste} onClick={() => commands.paste()} />
+      {/* На узком экране копирование и вставка доступны в инспекторе и контекстном меню. */}
+      <IconButton label={`${ru.toolbar.copy} (Ctrl+C)`} icon={Copy} disabled={!hasSelection} onClick={() => commands.copySelection()} className="max-sm:hidden" />
+      <IconButton label={`${ru.toolbar.paste} (Ctrl+V)`} icon={ClipboardPaste} disabled={!canPaste} onClick={() => commands.paste()} className="max-sm:hidden" />
       <IconButton label={`${ru.toolbar.delete} (Del)`} icon={Trash2} disabled={!hasSelection} onClick={() => commands.deleteSelection()} data-testid="delete" />
-      <Separator vertical />
-      <IconButton label={ru.toolbar.clear} icon={Eraser} disabled={isEmpty} onClick={() => commands.clearAll()} />
+      <Separator vertical className="hidden sm:block" />
+      <IconButton label={ru.toolbar.clear} icon={Eraser} disabled={isEmpty} onClick={() => commands.clearAll()} className="max-sm:hidden" />
+      <div className="ml-auto flex items-center gap-1">
+        <SimulationControls />
+        <Separator vertical />
+        <IconButton
+          label={ru.help.open}
+          icon={CircleHelp}
+          onClick={() => ui.getState().openDialog('shortcuts')}
+          className="max-sm:hidden"
+          data-testid="open-help"
+        />
+        <IconButton
+          label={ru.inspector.toggle}
+          icon={PanelRight}
+          active={inspectorOpen}
+          onClick={() => ui.getState().togglePanel('inspector')}
+          data-testid="toggle-inspector"
+        />
+      </div>
     </header>
   );
 }

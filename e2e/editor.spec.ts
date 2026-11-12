@@ -36,7 +36,7 @@ test.describe('рабочее поле', () => {
     }
     await expect(page.locator('.react-flow__background')).toBeVisible();
     await expect(page.locator('.react-flow__minimap')).toBeVisible();
-    await expect(page.getByTestId('status-bar')).toContainText('Перетащите элементы');
+    await expect(page.getByTestId('status-bar')).toContainText('Добавьте элементы из палитры');
   });
 
   test('масштаб кнопками и колёсиком, вписывание в экран', async ({ page }) => {
@@ -166,11 +166,33 @@ test.describe('соединения', () => {
     await expect(pin(page, g, 'in0')).not.toHaveAttribute('data-connect');
   });
 
-  test('некорректное соединение выход → выход не создаётся', async ({ page }) => {
+  test('некорректное соединение выход → выход не создаётся, причина показывается один раз', async ({ page }) => {
     const a = await dropElement(page, 'INPUT', { x: 120, y: 150 });
     const b = await dropElement(page, 'INPUT', { x: 120, y: 300 });
     await drawWire(page, pin(page, a, 'out0'), pin(page, b, 'out0'));
     await expect(wires(page)).toHaveCount(0);
+    const notification = page.getByTestId('notification');
+    await expect(notification).toHaveCount(1);
+    await expect(notification).toHaveAttribute('data-tone', 'warning');
+    await expect(notification).toContainText('два выхода или два входа');
+
+    // Повтор той же ошибки не добавляет новое уведомление, а увеличивает счётчик.
+    await drawWire(page, pin(page, a, 'out0'), pin(page, b, 'out0'));
+    await expect(notification).toHaveCount(1);
+    await expect(page.getByTestId('notification-count')).toHaveText('×2');
+
+    // Клик по пину без протягивания уведомлений не вызывает.
+    await page.getByTestId('notification').getByRole('button').click();
+    await pin(page, a, 'out0').click();
+    await expect(notification).toHaveCount(0);
+  });
+
+  test('уведомление скрывается само', async ({ page }) => {
+    const a = await dropElement(page, 'INPUT', { x: 120, y: 150 });
+    const b = await dropElement(page, 'INPUT', { x: 120, y: 300 });
+    await drawWire(page, pin(page, a, 'out0'), pin(page, b, 'out0'));
+    await expect(page.getByTestId('notification')).toHaveCount(1);
+    await expect(page.getByTestId('notification')).toHaveCount(0, { timeout: 6000 });
   });
 
   test('один выход на несколько входов; новый провод заменяет старый на занятом входе', async ({ page }) => {
@@ -184,10 +206,11 @@ test.describe('соединения', () => {
     await page.getByTestId(`input-toggle-${a}`).click();
     await expect(page.getByTestId(`node-${g}`)).toHaveAttribute('data-output', '1');
 
-    // B на занятый вход in1: провод от A к in1 заменяется.
+    // B на занятый вход in1: провод от A к in1 заменяется, пользователь получает уведомление.
     await drawWire(page, pin(page, b, 'out0'), pin(page, g, 'in1'));
     await expect(wires(page)).toHaveCount(2);
     await expect(page.getByTestId(`node-${g}`)).toHaveAttribute('data-output', '0');
+    await expect(page.getByTestId('notification')).toHaveAttribute('data-tone', 'info');
   });
 
   test('переподключение конца провода и удаление броском на пустое место', async ({ page }) => {

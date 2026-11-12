@@ -24,6 +24,8 @@ export interface AppCommands {
   /** Вставляет буфер обмена. `at` — позиция левого верхнего угла; без неё — со смещением от оригинала. */
   paste(at?: Point): void;
   duplicateSelection(): void;
+  /** Сдвигает выделенные элементы одним шагом истории. Не перекомпилирует схему. */
+  nudgeSelection(dx: number, dy: number): void;
 }
 
 function topLeft(fragment: CircuitFragment): Point {
@@ -110,6 +112,14 @@ export function createCommands({
     duplicateSelection() {
       const fragment = selectedFragment();
       if (fragment.components.length > 0) insert(fragment, { x: PASTE_OFFSET, y: PASTE_OFFSET });
+    },
+
+    nudgeSelection(dx, dy) {
+      const moves = selectedFragment().components.map((c) => ({
+        id: c.id,
+        position: { x: c.position.x + dx, y: c.position.y + dy },
+      }));
+      if (moves.length > 0) circuit.getState().moveComponents(moves);
     },
   };
   return commands;

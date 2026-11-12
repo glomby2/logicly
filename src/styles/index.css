@@ -76,6 +76,11 @@ body {
   filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.6));
 }
 
+/* Режим размещения тапом: поле показывает, что следующий клик поставит элемент. */
+[data-placing] .react-flow__pane {
+  cursor: crosshair;
+}
+
 .react-flow__selection {
   background: rgba(56, 189, 248, 0.08);
   border: 1px solid rgba(56, 189, 248, 0.6);

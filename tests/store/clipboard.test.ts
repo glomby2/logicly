@@ -119,6 +119,35 @@ describe('выделить всё и очистка', () => {
   });
 });
 
+describe('перемещение выделенного', () => {
+  it('сдвигает только выделенные элементы одним шагом истории без перекомпиляции', () => {
+    const { app, circuit, simulation, a, n } = selectedPair();
+    app.ui.getState().select({ components: [n] });
+    const compilations = simulation().compilations;
+    const versions = [circuit().structureVersion, circuit().propsVersion];
+    const past = circuit().history.past.length;
+
+    app.commands.nudgeSelection(10, -50);
+    const byId = Object.fromEntries(circuit().circuit.components.map((c) => [c.id, c.position]));
+    expect(byId[n]).toEqual({ x: 110, y: -50 });
+    expect(byId[a]).toEqual({ x: 0, y: 0 });
+    expect(simulation().compilations).toBe(compilations);
+    expect([circuit().structureVersion, circuit().propsVersion]).toEqual(versions);
+    expect(circuit().history.past).toHaveLength(past + 1);
+
+    circuit().undo();
+    expect(circuit().circuit.components.find((c) => c.id === n)!.position).toEqual({ x: 100, y: 0 });
+  });
+
+  it('без выделения ничего не делает', () => {
+    const { app, circuit } = selectedPair();
+    app.ui.getState().clearSelection();
+    const state = circuit().circuit;
+    app.commands.nudgeSelection(10, 0);
+    expect(circuit().circuit).toBe(state);
+  });
+});
+
 describe('переподключение провода через хранилище', () => {
   it('reconnect — один шаг истории и пересчёт симуляции', () => {
     const { app, circuit, signal } = createTestApp();

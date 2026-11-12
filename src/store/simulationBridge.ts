@@ -9,9 +9,12 @@ import {
 } from '@/core/simulation';
 import type { Circuit } from '@/core/types/circuit';
 import type { CircuitStore } from './circuitStore';
-import type { SimulationStore, SimulationStoreState } from './simulationStore';
+import type { SimulationResults, SimulationStore } from './simulationStore';
 
-/** Управление симуляцией. Start/Pause (таймер вокруг `step`) добавляются на уровне интерфейса. */
+/**
+ * Операции над движком. Интерфейс вызывает их не напрямую, а через `simulationController`,
+ * который управляет запуском, паузой, частотой и таймером.
+ */
 export interface SimulationBridge {
   /** Один шаг времени (Step): `onTick` у элементов времени и пересчёт. */
   step(): void;
@@ -45,8 +48,8 @@ export function connectSimulation({
   let engine!: SimulationEngine;
   let compilations = 0;
 
-  const publish = (result: SettleResult, extra: Partial<SimulationStoreState> = {}) => {
-    simulationStore.setState({
+  const publish = (result: SettleResult, extra: Partial<SimulationResults> = {}) => {
+    simulationStore.getState().publish({
       ...extra,
       signals: engine.getPinSignals(),
       status: result.status,
@@ -66,6 +69,7 @@ export function connectSimulation({
       floatingInputs: new Set(findFloatingInputs(netlist).map(netIdOf)),
       feedbackComponents: netlist.feedbackComponents,
       diagnostics: netlist.diagnostics,
+      hasTimeElements: netlist.components.some((c) => c.definition.onTick !== undefined),
     });
   };
 

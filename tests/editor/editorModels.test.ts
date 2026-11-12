@@ -4,7 +4,14 @@ import { canConnect } from '@/editor/connectionRules';
 import { buildContextMenu, type MenuEntry } from '@/editor/contextMenuModel';
 import { SELF_LOOP_MARGIN, selfLoopPath } from '@/editor/edges/wirePath';
 import { placementPosition, snapPoint } from '@/editor/placement';
-import { isEditableTarget, resolveShortcut, type KeyInput } from '@/editor/shortcuts';
+import {
+  isEditableTarget,
+  NUDGE_LARGE_STEP,
+  NUDGE_STEP,
+  resolveNudge,
+  resolveShortcut,
+  type KeyInput,
+} from '@/editor/shortcuts';
 import { SIGNAL_COLORS, signalColor, signalTone } from '@/editor/signalStyle';
 import { groupElements } from '@/features/palette/paletteModel';
 import { CircuitBuilder } from '../helpers/circuitBuilder';
@@ -42,6 +49,21 @@ describe('горячие клавиши', () => {
   it('работают в русской раскладке: важна физическая клавиша, а не символ', () => {
     expect(resolveShortcut(key('KeyZ', { key: 'я', ctrlKey: true }))).toBe('undo');
     expect(resolveShortcut(key('KeyC', { key: 'с', ctrlKey: true }))).toBe('copy');
+  });
+
+  it('справка: F1 и «?» в любой раскладке', () => {
+    expect(resolveShortcut(key('F1', { key: 'F1' }))).toBe('help');
+    expect(resolveShortcut(key('Slash', { key: '?', shiftKey: true }))).toBe('help');
+    expect(resolveShortcut(key('Digit7', { key: '?', shiftKey: true }))).toBe('help');
+  });
+
+  it('стрелки: шаг сетки, с Shift — крупный; с Ctrl/Alt — не перемещение', () => {
+    expect(resolveNudge(key('ArrowLeft', { key: 'ArrowLeft' }))).toEqual({ dx: -NUDGE_STEP, dy: 0 });
+    expect(resolveNudge(key('ArrowDown', { key: 'ArrowDown', shiftKey: true }))).toEqual({ dx: 0, dy: NUDGE_LARGE_STEP });
+    expect(resolveNudge(key('ArrowUp', { key: 'ArrowUp' }))).toEqual({ dx: 0, dy: -NUDGE_STEP });
+    expect(resolveNudge(key('ArrowRight', { key: 'ArrowRight', ctrlKey: true }))).toBeNull();
+    expect(resolveNudge(key('KeyA', { key: 'a' }))).toBeNull();
+    expect(resolveShortcut(key('ArrowLeft', { key: 'ArrowLeft' }))).toBeNull();
   });
 
   it('isEditableTarget без DOM возвращает false', () => {

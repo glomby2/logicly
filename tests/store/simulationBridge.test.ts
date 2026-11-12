@@ -44,7 +44,7 @@ describe('мост схема → движок', () => {
   it('переключение INPUT пересчитывает зависимую часть без перекомпиляции', () => {
     const { app, simulation, signal, a, b, g, l } = andCircuit();
     const compilations = simulation().compilations;
-    const engine = app.simulationControl.getEngine();
+    const engine = app.simulationBridge.getEngine();
 
     app.commands.toggleInput(a);
     expect(signal(out(g))).toBe(0);
@@ -53,13 +53,13 @@ describe('мост схема → движок', () => {
     // Пересчитаны только INPUT, AND и OUTPUT.
     expect(simulation().evaluations).toBe(3);
     expect(simulation().compilations).toBe(compilations);
-    expect(app.simulationControl.getEngine()).toBe(engine);
+    expect(app.simulationBridge.getEngine()).toBe(engine);
   });
 
   it('перемещение и переименование не затрагивают симуляцию', () => {
     const { app, simulation, circuit, g } = andCircuit();
     const state = simulation();
-    const engine = app.simulationControl.getEngine();
+    const engine = app.simulationBridge.getEngine();
 
     circuit().beginBatch();
     for (let x = 1; x <= 10; x++) circuit().moveComponents([{ id: g, position: { x, y: x } }]);
@@ -69,7 +69,7 @@ describe('мост схема → движок', () => {
     circuit().undo();
 
     expect(simulation()).toBe(state);
-    expect(app.simulationControl.getEngine()).toBe(engine);
+    expect(app.simulationBridge.getEngine()).toBe(engine);
   });
 
   it('удаление провода делает вход неподключённым (0) и обновляет выход', () => {
@@ -167,14 +167,14 @@ describe('управление временем: Step и Reset', () => {
     const { app, simulation, signal, circuit } = createTestApp({ registry });
     const clock = circuit().addComponent('TEST_CLOCK', { x: 0, y: 0 });
 
-    app.simulationControl.step();
+    app.simulationBridge.step();
     expect(simulation().time).toBe(1);
     expect(signal(out(clock))).toBe(1);
-    app.simulationControl.step();
+    app.simulationBridge.step();
     expect(signal(out(clock))).toBe(0);
 
-    app.simulationControl.step();
-    app.simulationControl.reset();
+    app.simulationBridge.step();
+    app.simulationBridge.reset();
     expect(simulation().time).toBe(0);
     expect(signal(out(clock))).toBe(0);
   });
@@ -184,8 +184,8 @@ describe('управление временем: Step и Reset', () => {
     registry.register(TEST_CLOCK);
     const { app, simulation, circuit } = createTestApp({ registry });
     circuit().addComponent('TEST_CLOCK', { x: 0, y: 0 });
-    app.simulationControl.step();
-    app.simulationControl.step();
+    app.simulationBridge.step();
+    app.simulationBridge.step();
     circuit().addComponent('NOT', { x: 0, y: 0 });
     expect(simulation().time).toBe(2);
   });

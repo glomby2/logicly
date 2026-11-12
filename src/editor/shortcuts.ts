@@ -7,7 +7,8 @@ export type ShortcutAction =
   | 'duplicate'
   | 'selectAll'
   | 'delete'
-  | 'escape';
+  | 'escape'
+  | 'help';
 
 export interface KeyInput {
   readonly key: string;
@@ -37,7 +38,29 @@ export function resolveShortcut(input: KeyInput): ShortcutAction | null {
   }
   if (input.key === 'Delete' || input.key === 'Backspace') return 'delete';
   if (input.key === 'Escape') return 'escape';
+  // «?» проверяется по символу: в русской раскладке это Shift+7, в английской — Shift+/.
+  if (input.key === 'F1' || input.key === '?') return 'help';
   return null;
+}
+
+/** Шаг перемещения стрелками: обычный — шаг сетки, с Shift — крупный. */
+export const NUDGE_STEP = 10;
+export const NUDGE_LARGE_STEP = 50;
+
+const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+};
+
+/** Смещение выделенного для нажатой стрелки; `null` — не стрелка или с модификатором. */
+export function resolveNudge(input: KeyInput): { dx: number; dy: number } | null {
+  if (input.ctrlKey || input.metaKey || input.altKey) return null;
+  const direction = ARROWS[input.key];
+  if (!direction) return null;
+  const step = input.shiftKey ? NUDGE_LARGE_STEP : NUDGE_STEP;
+  return { dx: direction[0] * step, dy: direction[1] * step };
 }
 
 /** Нажатия в полях ввода не должны управлять редактором. */

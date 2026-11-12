@@ -8,6 +8,13 @@ export function netIdOf(ref: PinRef): NetId {
   return `${ref.componentId}:${ref.pinId}`;
 }
 
+/** Обратное к `netIdOf`: ключ `componentId:pinId` → ссылка на пин. Id пина не содержит `:`. */
+export function pinRefFromKey(key: string): PinRef | null {
+  const separator = key.lastIndexOf(':');
+  if (separator <= 0 || separator === key.length - 1) return null;
+  return { componentId: key.slice(0, separator), pinId: key.slice(separator + 1) };
+}
+
 export interface CompiledComponent {
   readonly index: number;
   readonly id: ComponentId;

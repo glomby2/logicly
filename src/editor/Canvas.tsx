@@ -14,10 +14,18 @@ import {
 } from '@xyflow/react';
 import { useCallback, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { removeWires } from '@/core/circuit';
+import type { Circuit } from '@/core/types/circuit';
+import { ru } from '@/i18n/ru';
 import { appStores } from '@/store/hooks';
 import { applySelectionChanges, collectMoves } from './adapters/flowChanges';
-import { connectionPins, type ElementNode, type FlowConnectionLike, type WireEdge } from './adapters/flowMapping';
-import { canConnect } from './connectionRules';
+import {
+  connectionPins,
+  pinFromHandle,
+  type ElementNode,
+  type FlowConnectionLike,
+  type WireEdge,
+} from './adapters/flowMapping';
+import { canConnect, connectionRejection } from './connectionRules';
 import { ContextMenu, type ContextMenuState } from './ContextMenu';
 import type { MenuCommand, MenuTarget } from './contextMenuModel';
 import { edgeTypes } from './edges/edgeTypes';
@@ -34,6 +42,15 @@ const MINIMAP_COLORS: Record<string, string> = { input: '#a7f3d0', output: '#fde
 
 const { circuit: circuitStore, ui: uiStore, commands } = appStores;
 
+/** Провод отпущен на пине, но соединение недопустимо — объяснить почему. */
+function notifyRejection(circuit: Circuit, state: FinalConnectionState) {
+  if (!state.toHandle || state.isValid) return;
+  const from = pinFromHandle(state.fromHandle?.nodeId, state.fromHandle?.id);
+  const to = pinFromHandle(state.toHandle.nodeId, state.toHandle.id);
+  const reason = from && to ? connectionRejection(circuit, appStores.registry, from, to) : null;
+  if (reason) uiStore.getState().notify(ru.notifications.connection[reason], 'warning');
+}
+
 /**
  * Рабочее поле. React Flow — только визуальный слой: узлы и провода строятся из circuitStore,
  * а все изменения уходят в хранилища через их действия и команды.
@@ -48,9 +65,21 @@ export function Canvas() {
   const closeMenu = useCallback(() => setMenu(null), []);
   const onEscape = useCallback(() => {
     setMenu(null);
+    uiStore.getState().cancelPlacement();
     uiStore.getState().clearSelection();
   }, []);
   useKeyboardShortcuts(onEscape);
+
+  /** Клик или тап по пустому полю: в режиме размещения ставит выбранный элемент. */
+  const onPaneClick = useCallback(
+    (event: ReactMouseEvent) => {
+      setMenu(null);
+      const { placement } = uiStore.getState();
+      if (!placement) return;
+      commands.placeElement(placement, placementPosition(screenToFlowPosition({ x: event.clientX, y: event.clientY })));
+    },
+    [screenToFlowPosition],
+  );
 
   const onNodesChange = useCallback((changes: NodeChange<ElementNode>[]) => {
     const moves = collectMoves(changes);
@@ -74,7 +103,14 @@ export function Canvas() {
 
   const onConnect = useCallback((connection: FlowConnectionLike) => {
     const pins = connectionPins(connection);
-    if (pins) circuitStore.getState().connect(pins[0], pins[1]);
+    if (!pins) return;
+    const check = circuitStore.getState().connect(pins[0], pins[1]);
+    if (check.ok && check.replaces) uiStore.getState().notify(ru.notifications.wireReplaced, 'info');
+  }, []);
+
+  const onConnectEnd = useCallback((_: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+    if (reconnecting.current) return;
+    notifyRejection(circuitStore.getState().circuit, state);
   }, []);
 
   const onReconnectStart = useCallback((_: ReactMouseEvent, edge: Edge) => {
@@ -91,6 +127,7 @@ export function Canvas() {
       reconnecting.current = null;
       // Конец провода брошен на пустое место — провод удаляется.
       if (!state.toHandle) circuitStore.getState().remove({ wires: [edge.id] });
+      else notifyRejection(removeWires(circuitStore.getState().circuit, [edge.id]), state);
     },
     [],
   );
@@ -195,6 +232,7 @@ export function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
         isValidConnection={isValidConnection}
         onReconnectStart={onReconnectStart}
         onReconnect={onReconnect}
@@ -207,7 +245,7 @@ export function Canvas() {
         onSelectionContextMenu={onSelectionContextMenu}
         onEdgeContextMenu={onEdgeContextMenu}
         onPaneContextMenu={onPaneContextMenu}
-        onPaneClick={closeMenu}
+        onPaneClick={onPaneClick}
         onMoveStart={closeMenu}
         connectionMode={ConnectionMode.Loose}
         connectionRadius={28}
@@ -215,6 +253,8 @@ export function Canvas() {
         edgesReconnectable
         reconnectRadius={12}
         deleteKeyCode={null}
+        // Стрелки обрабатывает useKeyboardShortcuts — иначе выделенное сдвигалось бы дважды.
+        disableKeyboardA11y
         selectionKeyCode="Shift"
         multiSelectionKeyCode={MULTI_SELECT_KEYS}
         snapToGrid

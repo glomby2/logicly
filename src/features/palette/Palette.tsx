@@ -4,6 +4,7 @@ import type { ElementDefinition } from '@/core/types/element';
 import { ELEMENT_DRAG_TYPE, placementPosition, WIDE_SCREEN } from '@/editor/placement';
 import { ru } from '@/i18n/ru';
 import { cn } from '@/lib/cn';
+import { isCoarsePointer } from '@/lib/pointer';
 import { appStores, useUiStore } from '@/store/hooks';
 import { ElementPreview } from './ElementPreview';
 import { groupElements } from './paletteModel';
@@ -17,14 +18,30 @@ export function Palette() {
   const groups = useMemo(() => groupElements(appStores.registry.list()), []);
   const { screenToFlowPosition } = useReactFlow();
 
+  const placement = useUiStore((s) => s.placement);
+
   const placeAtCenter = (definition: ElementDefinition) => {
     const rect = document.querySelector('[data-canvas]')?.getBoundingClientRect();
     if (!rect) return;
     const step = (appStores.circuit.getState().circuit.components.length % CLICK_CYCLE) * CLICK_STEP;
     const center = screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
     appStores.commands.placeElement(definition.type, placementPosition({ x: center.x + step, y: center.y + step }));
-    // На узком экране палитра перекрывает поле — закрываем её, чтобы был виден добавленный элемент.
-    if (window.innerWidth < WIDE_SCREEN) appStores.ui.getState().setPanel('palette', false);
+  };
+
+  /**
+   * Мышь: элемент добавляется в центр поля. Палец: включается режим размещения —
+   * элемент ставится следующим тапом по полю в выбранную точку; повторный тап отменяет.
+   */
+  const onClick = (definition: ElementDefinition) => {
+    const ui = appStores.ui.getState();
+    if (isCoarsePointer()) {
+      if (placement === definition.type) ui.cancelPlacement();
+      else ui.startPlacement(definition.type);
+    } else {
+      placeAtCenter(definition);
+    }
+    // На узком экране палитра перекрывает поле — закрываем её, чтобы поле было видно.
+    if (window.innerWidth < WIDE_SCREEN) ui.setPanel('palette', false);
   };
 
   const onDragStart = (event: DragEvent, definition: ElementDefinition) => {
@@ -55,12 +72,14 @@ export function Palette() {
                 type="button"
                 draggable
                 onDragStart={(event) => onDragStart(event, definition)}
-                onClick={() => placeAtCenter(definition)}
+                onClick={() => onClick(definition)}
+                aria-pressed={placement === definition.type}
                 title={definition.description}
                 className={cn(
                   'flex h-16 flex-col items-center justify-center gap-1 rounded-md border border-slate-700/70 bg-slate-800/60',
                   'cursor-grab text-[11px] font-semibold tracking-wide text-slate-200 active:cursor-grabbing',
                   'hover:border-sky-500/60 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-500',
+                  placement === definition.type && 'border-sky-400 bg-sky-500/10 ring-1 ring-sky-400',
                 )}
                 data-testid={`palette-${definition.type}`}
               >
