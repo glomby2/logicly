@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { carryInteractiveProps, changedPropKeys, classifyChange, updateComponentProps } from '@/core/circuit';
+import { carryInteractiveProps, changedPropKeys, circuitsEqual, classifyChange, updateComponentProps } from '@/core/circuit';
 import { createDefaultRegistry } from '@/core/elements';
 import type { Circuit } from '@/core/types/circuit';
 import { CircuitBuilder } from '../../helpers/circuitBuilder';
@@ -80,5 +80,35 @@ describe('carryInteractiveProps', () => {
     const snapshot = new CircuitBuilder().input('A').gate('G', 'AND', 3).build();
     const current = new CircuitBuilder().gate('G', 'AND', 5).build();
     expect(carryInteractiveProps(snapshot, current, registry)).toBe(snapshot);
+  });
+});
+
+describe('circuitsEqual', () => {
+  it('та же ссылка и копия с тем же содержимым — равны', () => {
+    const circuit = base();
+    expect(circuitsEqual(circuit, circuit)).toBe(true);
+    expect(circuitsEqual(circuit, structuredClone(circuit))).toBe(true);
+  });
+
+  it('порядок ключей свойств и пустая подпись не важны', () => {
+    const circuit = base();
+    expect(circuitsEqual(circuit, mapComponent(circuit, 'G', (c) => ({ props: { ...c.props } })))).toBe(true);
+    expect(circuitsEqual(circuit, mapComponent(circuit, 'G', () => ({ label: '' })))).toBe(true);
+  });
+
+  it('различаются позиция, подпись, свойство, тип, провод, порядок', () => {
+    const circuit = base();
+    const changed: Circuit[] = [
+      mapComponent(circuit, 'G', () => ({ position: { x: 0, y: 1 } })),
+      mapComponent(circuit, 'G', () => ({ label: 'G1' })),
+      mapComponent(circuit, 'G', () => ({ props: { inputCount: 4 } })),
+      mapComponent(circuit, 'A', () => ({ props: { value: true } })),
+      mapComponent(circuit, 'G', () => ({ type: 'OR' })),
+      { ...circuit, wires: circuit.wires.slice(1) },
+      { ...circuit, wires: [...circuit.wires].reverse() },
+      { ...circuit, components: [...circuit.components].reverse() },
+      { ...circuit, components: circuit.components.slice(1) },
+    ];
+    for (const next of changed) expect(circuitsEqual(circuit, next)).toBe(false);
   });
 });

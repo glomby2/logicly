@@ -3,6 +3,7 @@ import {
   addComponent,
   carryInteractiveProps,
   changedPropKeys,
+  circuitsEqual,
   classifyChange,
   connect,
   findComponent,
@@ -17,6 +18,7 @@ import {
   type ConnectionCheck,
 } from '@/core/circuit';
 import type { ElementRegistry } from '@/core/elements';
+import { normalizeDocumentName } from '@/core/serialization';
 import {
   EMPTY_CIRCUIT,
   type Circuit,
@@ -46,9 +48,25 @@ export interface RemoveItems {
   readonly wires?: Iterable<WireId>;
 }
 
+export interface LoadOptions {
+  /** Название документа; по умолчанию пустое (интерфейс показывает «Без названия»). */
+  readonly name?: string;
+  /**
+   * Совпадает ли загруженная схема с файлом на диске. `false` — схема была исправлена
+   * при загрузке, и индикатор несохранённых изменений должен гореть. По умолчанию `true`.
+   */
+  readonly saved?: boolean;
+}
+
 export interface CircuitStoreState {
   /** Схема — то, что сохраняется в файл. Вычисленные сигналы здесь не хранятся. */
   readonly circuit: Circuit;
+  /** Название документа. Сохраняется в файл, но не в историю undo/redo. */
+  readonly name: string;
+  /** Схема на момент последнего сохранения или загрузки; `null` — не совпадает ни с одним файлом. */
+  readonly savedCircuit: Circuit | null;
+  /** Название на момент последнего сохранения или загрузки. */
+  readonly savedName: string;
   /** Загрузка или очистка документа: симуляция начинается заново. */
   readonly documentVersion: number;
   /** Изменение топологии или набора пинов: нужна перекомпиляция netlist. */
@@ -71,8 +89,14 @@ export interface CircuitStoreState {
   /** Вставляет копию фрагмента с новыми id и смещением — одним шагом истории. Возвращает вставленное. */
   insertFragment(fragment: CircuitFragment, offset: Point): CircuitFragment;
   remove(items: RemoveItems): void;
-  loadCircuit(circuit: Circuit): void;
+  /** Новый документ: история очищается, симуляция начинается с состояния включения. */
+  loadCircuit(circuit: Circuit, options?: LoadOptions): void;
+  /** Новый пустой документ без названия. */
   clear(): void;
+  /** Переименовывает документ. Не записывается в историю и не затрагивает симуляцию. */
+  renameDocument(name: string): void;
+  /** Текущая схема и название сохранены в файл: индикатор несохранённых изменений гаснет. */
+  markSaved(): void;
   undo(): void;
   redo(): void;
   /** Группирует последующие изменения в один шаг истории (например, перетаскивание). */
@@ -134,10 +158,14 @@ export function createCircuitStore({
       });
     };
 
-    const load = (circuit: Circuit) => {
+    const load = (circuit: Circuit, { name = '', saved = true }: LoadOptions = {}) => {
       const state = get();
+      const documentName = normalizeDocumentName(name);
       set({
         circuit,
+        name: documentName,
+        savedCircuit: saved ? circuit : null,
+        savedName: documentName,
         documentVersion: state.documentVersion + 1,
         structureVersion: state.structureVersion + 1,
         history: emptyHistory(),
@@ -147,6 +175,9 @@ export function createCircuitStore({
 
     return {
       circuit: EMPTY_CIRCUIT,
+      name: '',
+      savedCircuit: EMPTY_CIRCUIT,
+      savedName: '',
       documentVersion: 0,
       structureVersion: 0,
       propsVersion: 0,
@@ -239,6 +270,16 @@ export function createCircuitStore({
       loadCircuit: load,
       clear: () => load(EMPTY_CIRCUIT),
 
+      renameDocument(name) {
+        const next = normalizeDocumentName(name);
+        if (next !== get().name) set({ name: next });
+      },
+
+      markSaved() {
+        const { circuit, name } = get();
+        set({ savedCircuit: circuit, savedName: name });
+      },
+
       undo: () => travel(undoHistory(get().history, get().circuit)),
       redo: () => travel(redoHistory(get().history, get().circuit)),
 
@@ -260,3 +301,11 @@ export function createCircuitStore({
 
 export const selectCanUndo = (state: CircuitStoreState) => state.history.past.length > 0 && state.batchStart === null;
 export const selectCanRedo = (state: CircuitStoreState) => state.history.future.length > 0 && state.batchStart === null;
+
+/**
+ * Есть ли несохранённые изменения. Сначала сравниваются ссылки: undo до сохранённого
+ * снимка возвращает тот же объект. Если ссылки разные, сравнивается содержимое —
+ * так переключение INPUT туда и обратно или возврат элемента на место не считаются правкой.
+ */
+export const selectIsDirty = (state: CircuitStoreState) =>
+  state.savedCircuit === null || state.name !== state.savedName || !circuitsEqual(state.circuit, state.savedCircuit);

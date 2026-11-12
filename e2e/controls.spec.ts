@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { center, compilations, drawWire, dropElement, nodesOfType, pin } from './support';
+import {
+  center,
+  compilations,
+  drawWire,
+  dropElement,
+  expectPanelClosed,
+  expectPanelOpen,
+  nodesOfType,
+  pin,
+} from './support';
 
 test.describe('мышь и клавиатура', () => {
   test.beforeEach(async ({ page }) => {
@@ -99,9 +108,10 @@ test.describe('мышь и клавиатура', () => {
 test.describe('сенсорный экран', () => {
   test.use({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true });
 
+  /** Открывает палитру и ждёт окончания анимации выезда. */
   async function openPalette(page: Page) {
     await page.getByTestId('toggle-palette').tap();
-    await expect(page.getByTestId('palette')).toBeInViewport();
+    await expectPanelOpen(page.getByTestId('palette'));
   }
 
   test.beforeEach(async ({ page }) => {
@@ -117,6 +127,30 @@ test.describe('сенсорный экран', () => {
     await expect(page.getByTestId('open-help')).toBeHidden();
     await expect(page.getByTestId('delete')).toBeVisible();
     await expect(page.getByTestId('sim-reset')).toBeVisible();
+  });
+
+  test('закрытые панели не расширяют страницу; поле на всю ширину; открытые панели видны целиком', async ({ page }) => {
+    const documentOverflow = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    const width = page.viewportSize()!.width;
+    expect(await documentOverflow()).toBeLessThanOrEqual(0);
+
+    // Поле не обрезано: занимает всю ширину рабочей области.
+    const canvas = (await page.locator('[data-canvas]').boundingBox())!;
+    expect(canvas.x).toBeCloseTo(0, 0);
+    expect(canvas.width).toBeCloseTo(width, 0);
+    await expect(page.getByTestId('zoom-in')).toBeInViewport({ ratio: 1 });
+
+    await openPalette(page);
+    expect(await documentOverflow()).toBeLessThanOrEqual(0);
+    await expect(page.getByTestId('palette-INPUT')).toBeInViewport({ ratio: 1 });
+    await page.getByTestId('toggle-palette').tap();
+    await expect(page.getByTestId('palette')).not.toBeInViewport();
+
+    await page.getByTestId('toggle-inspector').tap();
+    await expectPanelOpen(page.getByTestId('inspector'));
+    expect(await documentOverflow()).toBeLessThanOrEqual(0);
+    const inspector = (await page.getByTestId('inspector').boundingBox())!;
+    expect(inspector.x + inspector.width).toBeCloseTo(width, 0);
   });
 
   test('тап по палитре, затем тап по полю ставит элемент в точку касания', async ({ page }) => {
@@ -146,6 +180,7 @@ test.describe('сенсорный экран', () => {
 
     await openPalette(page);
     await page.getByTestId('palette-NOT').tap();
+    await expectPanelClosed(page.getByTestId('palette'));
     await page.getByTestId('placement-hint').getByRole('button').tap();
     await expect(page.getByTestId('placement-hint')).toHaveCount(0);
     const canvas = (await page.locator('[data-canvas]').boundingBox())!;
@@ -156,6 +191,8 @@ test.describe('сенсорный экран', () => {
   test('переключение INPUT тапом и удаление из инспектора без клавиатуры', async ({ page }) => {
     await openPalette(page);
     await page.getByTestId('palette-INPUT').tap();
+    // Палитра уезжает; тап по полю раньше конца анимации попал бы в неё (в кнопку OR).
+    await expectPanelClosed(page.getByTestId('palette'));
     const canvas = (await page.locator('[data-canvas]').boundingBox())!;
     await page.touchscreen.tap(canvas.x + 150, canvas.y + 200);
     const input = nodesOfType(page, 'INPUT');
@@ -166,7 +203,7 @@ test.describe('сенсорный экран', () => {
     await expect(toggle).toHaveAttribute('aria-pressed', 'true');
 
     await page.getByTestId('toggle-inspector').tap();
-    await expect(page.getByTestId('inspector')).toBeInViewport();
+    await expectPanelOpen(page.getByTestId('inspector'));
     await expect(page.getByTestId('inspector-title')).toHaveText('INPUT');
     await page.getByTestId('inspector-delete').tap();
     await expect(input).toHaveCount(0);

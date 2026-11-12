@@ -29,6 +29,7 @@ import { canConnect, connectionRejection } from './connectionRules';
 import { ContextMenu, type ContextMenuState } from './ContextMenu';
 import type { MenuCommand, MenuTarget } from './contextMenuModel';
 import { edgeTypes } from './edges/edgeTypes';
+import { useFitViewOnLoad } from './hooks/useFitViewOnLoad';
 import { useFlowElements } from './hooks/useFlowElements';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { nodeTypes } from './nodes/nodeTypes';
@@ -58,6 +59,7 @@ function notifyRejection(circuit: Circuit, state: FinalConnectionState) {
 export function Canvas() {
   const { nodes, edges } = useFlowElements();
   const { screenToFlowPosition, fitView } = useReactFlow<ElementNode, WireEdge>();
+  useFitViewOnLoad();
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   /** Провод, конец которого сейчас переподключается: при проверке соединения его не учитываем. */
   const reconnecting = useRef<string | null>(null);

@@ -2,6 +2,10 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { useEffect } from 'react';
 import { Canvas } from '@/editor/Canvas';
 import { WIDE_SCREEN } from '@/editor/placement';
+import { DiscardChangesDialog } from '@/features/file/DiscardChangesDialog';
+import { useDocumentTitle } from '@/features/file/useDocumentTitle';
+import { useFileShortcuts } from '@/features/file/useFileShortcuts';
+import { useUnsavedChangesGuard } from '@/features/file/useUnsavedChangesGuard';
 import { ShortcutsDialog } from '@/features/help/ShortcutsDialog';
 import { Inspector } from '@/features/inspector/Inspector';
 import { Notifications } from '@/features/notifications/Notifications';
@@ -13,6 +17,9 @@ import { appStores, useUiStore } from '@/store/hooks';
 
 export function App() {
   const placing = useUiStore((s) => s.placement !== null);
+  useFileShortcuts();
+  useUnsavedChangesGuard();
+  useDocumentTitle();
 
   useEffect(() => {
     if (window.innerWidth >= WIDE_SCREEN) return;
@@ -24,7 +31,12 @@ export function App() {
     <ReactFlowProvider>
       <div className="flex h-dvh flex-col bg-slate-950 text-slate-100">
         <Toolbar />
-        <div className="relative flex min-h-0 flex-1">
+        {/*
+          overflow-hidden: закрытые выдвижные панели (палитра, инспектор) сдвинуты за край
+          и не должны увеличивать ширину документа. Меню, диалоги и уведомления — fixed,
+          у контейнера нет transform, поэтому они не обрезаются.
+        */}
+        <div className="relative flex min-h-0 flex-1 overflow-hidden" data-testid="workspace">
           <Palette />
           <main className="relative min-w-0 flex-1" data-placing={placing || undefined}>
             <Canvas />
@@ -35,6 +47,7 @@ export function App() {
         <StatusBar />
         <Notifications />
         <ShortcutsDialog />
+        <DiscardChangesDialog />
       </div>
     </ReactFlowProvider>
   );

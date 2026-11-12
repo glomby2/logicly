@@ -1,32 +1,40 @@
-import { AlertTriangle, Info, X } from 'lucide-react';
+import { AlertTriangle, CircleAlert, Info, X, type LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import { ru } from '@/i18n/ru';
 import { cn } from '@/lib/cn';
-import type { AppNotification } from '@/store';
+import type { AppNotification, NotificationTone } from '@/store';
 import { appStores, useUiStore } from '@/store/hooks';
 
-/** Время показа уведомления, мс. Повтор сообщения перезапускает отсчёт. */
+/** Время показа уведомления, мс. Повтор сообщения перезапускает отсчёт. Ошибки скрываются только вручную. */
 const VISIBLE_MS = 4000;
+
+const TONES: Readonly<Record<NotificationTone, { icon: LucideIcon; box: string; iconColor: string }>> = {
+  info: { icon: Info, box: 'border-sky-500/40 text-slate-100', iconColor: 'text-sky-400' },
+  warning: { icon: AlertTriangle, box: 'border-amber-500/50 text-amber-100', iconColor: 'text-amber-400' },
+  error: { icon: CircleAlert, box: 'border-rose-500/60 text-rose-100', iconColor: 'text-rose-400' },
+};
 
 function Toast({ notification }: { notification: AppNotification }) {
   const { id, revision, tone, message, count } = notification;
 
   useEffect(() => {
+    if (tone === 'error') return;
     const timer = window.setTimeout(() => appStores.ui.getState().dismissNotification(id), VISIBLE_MS);
     return () => window.clearTimeout(timer);
-  }, [id, revision]);
+  }, [id, revision, tone]);
 
-  const Icon = tone === 'warning' ? AlertTriangle : Info;
+  const { icon: Icon, box, iconColor } = TONES[tone];
   return (
     <div
       className={cn(
-        'pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-sm shadow-lg shadow-black/40',
-        tone === 'warning' ? 'border-amber-500/50 bg-slate-900 text-amber-100' : 'border-sky-500/40 bg-slate-900 text-slate-100',
+        'pointer-events-auto flex items-start gap-2 rounded-lg border bg-slate-900 px-3 py-2 text-sm shadow-lg shadow-black/40',
+        box,
       )}
+      role={tone === 'error' ? 'alert' : undefined}
       data-testid="notification"
       data-tone={tone}
     >
-      <Icon className={cn('mt-0.5 size-4 shrink-0', tone === 'warning' ? 'text-amber-400' : 'text-sky-400')} aria-hidden />
+      <Icon className={cn('mt-0.5 size-4 shrink-0', iconColor)} aria-hidden />
       <span className="flex-1">
         {message}
         {count > 1 && (

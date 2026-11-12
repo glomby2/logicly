@@ -1,14 +1,57 @@
 import { extractFragment, findComponent, nextLabel, type CircuitFragment } from '@/core/circuit';
 import type { ElementRegistry } from '@/core/elements';
+import {
+  baseName,
+  isSupportedFileName,
+  normalizeDocumentName,
+  parseCircuitFile,
+  serializeCircuit,
+  toFileName,
+  type FileError,
+  type FileWarning,
+} from '@/core/serialization';
 import type { ComponentId, Point } from '@/core/types/circuit';
-import type { CircuitStore } from './circuitStore';
-import { EMPTY_SELECTION, type UiStore } from './uiStore';
+import { selectIsDirty, type CircuitStore } from './circuitStore';
+import { EMPTY_SELECTION, type PendingDocument, type UiStore } from './uiStore';
 
 /** Смещение каждой следующей вставки и дубликата, px. */
 export const PASTE_OFFSET = 20;
 
+export type OpenDocumentResult =
+  /** Критическая ошибка: документ, история, название и симуляция не изменились. */
+  | { readonly status: 'rejected'; readonly errors: readonly FileError[] }
+  | { readonly status: 'loaded'; readonly name: string; readonly warnings: readonly FileWarning[] }
+  /** Есть несохранённые изменения — открыт диалог подтверждения. */
+  | { readonly status: 'pending' };
+
+export type SaveDocumentResult =
+  | { readonly ok: true; readonly fileName: string }
+  | { readonly ok: false; readonly error: unknown };
+
+/** Запускает скачивание файла. Исключение означает, что скачивание не началось. */
+export type DownloadFile = (fileName: string, text: string) => void;
+
 /** Действия, затрагивающие несколько хранилищ. Компоненты интерфейса вызывают их, а не сторы по отдельности. */
 export interface AppCommands {
+  /** Новый пустой документ. При несохранённых изменениях сначала открывается диалог подтверждения. */
+  newDocument(): 'created' | 'pending';
+  /**
+   * Открывает файл: проверка расширения, разбор и проверка (`parseCircuitFile`), затем загрузка
+   * целиком. При критической ошибке ничего не меняется. При несохранённых изменениях
+   * разобранный документ ждёт подтверждения в диалоге.
+   */
+  openDocument(fileName: string, text: string): OpenDocumentResult;
+  /** Применяет документ, ожидающий подтверждения. Возвращает его или `null`, если ждать было нечего. */
+  confirmPendingDocument(): PendingDocument | null;
+  cancelPendingDocument(): void;
+  /**
+   * Сериализует документ и передаёт файл в `download`. Индикатор несохранённых изменений
+   * гаснет только если скачивание запустилось без ошибки. `fallbackName` — имя файла
+   * для документа без названия.
+   */
+  saveDocument(download: DownloadFile, fallbackName: string): SaveDocumentResult;
+  /** Переименовывает документ (не записывается в историю undo/redo). */
+  renameDocument(name: string): void;
   /** Удаляет выделенные элементы (с их проводами) и провода. */
   deleteSelection(): void;
   /** Размещает элемент с автоматической подписью (если она задана типом), выделяет его и завершает режим размещения. */
@@ -54,7 +97,59 @@ export function createCommands({
     });
   };
 
+  /** Заменяет документ целиком. Выделение и режим размещения сбрасываются явно: id нового документа могут совпасть со старыми. */
+  const applyDocument = (pending: PendingDocument) => {
+    if (pending.kind === 'new') circuit.getState().clear();
+    else circuit.getState().loadCircuit(pending.circuit, { name: pending.name, saved: pending.warnings.length === 0 });
+    ui.setState({ selection: EMPTY_SELECTION, placement: null, pasteCount: 0, dialog: null, pendingDocument: null });
+  };
+
+  /** Применяет документ сразу или, если текущий изменён, откладывает до подтверждения. */
+  const replaceDocument = (pending: PendingDocument): boolean => {
+    if (selectIsDirty(circuit.getState())) {
+      ui.getState().confirmDiscard(pending);
+      return false;
+    }
+    applyDocument(pending);
+    return true;
+  };
+
   const commands: AppCommands = {
+    newDocument: () => (replaceDocument({ kind: 'new' }) ? 'created' : 'pending'),
+
+    openDocument(fileName, text) {
+      if (!isSupportedFileName(fileName)) {
+        return { status: 'rejected', errors: [{ code: 'unsupported-extension', detail: fileName }] };
+      }
+      const result = parseCircuitFile(text, registry);
+      if (!result.ok) return { status: 'rejected', errors: result.errors };
+      const name = result.name || normalizeDocumentName(baseName(fileName));
+      const pending: PendingDocument = { kind: 'open', circuit: result.circuit, name, warnings: result.warnings };
+      return replaceDocument(pending) ? { status: 'loaded', name, warnings: result.warnings } : { status: 'pending' };
+    },
+
+    confirmPendingDocument() {
+      const { pendingDocument } = ui.getState();
+      if (pendingDocument) applyDocument(pendingDocument);
+      return pendingDocument;
+    },
+
+    cancelPendingDocument: () => ui.getState().closeDialog(),
+
+    saveDocument(download, fallbackName) {
+      const { circuit: current, name } = circuit.getState();
+      const fileName = toFileName(name, fallbackName);
+      try {
+        download(fileName, serializeCircuit(current, name));
+      } catch (error) {
+        return { ok: false, error };
+      }
+      circuit.getState().markSaved();
+      return { ok: true, fileName };
+    },
+
+    renameDocument: (name) => circuit.getState().renameDocument(name),
+
     deleteSelection() {
       const { selection } = ui.getState();
       if (selection.components.length === 0 && selection.wires.length === 0) return;

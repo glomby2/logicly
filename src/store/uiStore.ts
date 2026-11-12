@@ -1,5 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { CircuitFragment } from '@/core/circuit';
+import type { FileWarning } from '@/core/serialization';
 import type { Circuit, ComponentId, WireId } from '@/core/types/circuit';
 import { pushNotification, type AppNotification, type NotificationTone } from './notifications';
 
@@ -10,7 +11,17 @@ export interface Selection {
 
 export type PanelId = 'palette' | 'inspector';
 export type ThemePreference = 'system' | 'light' | 'dark';
-export type DialogId = 'shortcuts' | 'truth-table';
+export type DialogId = 'shortcuts' | 'truth-table' | 'discard-changes';
+
+/** Документ, который откроется после подтверждения потери несохранённых изменений. */
+export type PendingDocument =
+  | { readonly kind: 'new' }
+  | {
+      readonly kind: 'open';
+      readonly circuit: Circuit;
+      readonly name: string;
+      readonly warnings: readonly FileWarning[];
+    };
 
 export interface UiStoreState {
   readonly selection: Selection;
@@ -24,6 +35,8 @@ export interface UiStoreState {
   readonly pasteCount: number;
   /** Ограниченная очередь уведомлений без повторов. */
   readonly notifications: readonly AppNotification[];
+  /** Ожидает подтверждения в диалоге `discard-changes`. Закрытие диалога его сбрасывает. */
+  readonly pendingDocument: PendingDocument | null;
 
   select(selection: Partial<Selection>): void;
   clearSelection(): void;
@@ -33,7 +46,10 @@ export interface UiStoreState {
   togglePanel(panel: PanelId): void;
   setTheme(theme: ThemePreference): void;
   openDialog(dialog: DialogId): void;
+  /** Закрывает диалог и отменяет ожидающий документ. */
   closeDialog(): void;
+  /** Открывает диалог подтверждения для документа, который заменит текущий. */
+  confirmDiscard(pending: PendingDocument): void;
   startPlacement(type: string): void;
   cancelPlacement(): void;
   setClipboard(fragment: CircuitFragment): void;
@@ -58,6 +74,7 @@ export function createUiStore(): UiStore {
     clipboard: null,
     pasteCount: 0,
     notifications: [],
+    pendingDocument: null,
 
     select: ({ components = [], wires = [] }) => set({ selection: { components, wires } }),
 
@@ -81,7 +98,8 @@ export function createUiStore(): UiStore {
     togglePanel: (panel) => set({ panels: { ...get().panels, [panel]: !get().panels[panel] } }),
     setTheme: (theme) => set({ theme }),
     openDialog: (dialog) => set({ dialog }),
-    closeDialog: () => set({ dialog: null }),
+    closeDialog: () => set({ dialog: null, pendingDocument: null }),
+    confirmDiscard: (pending) => set({ dialog: 'discard-changes', pendingDocument: pending }),
     startPlacement: (type) => set({ placement: type }),
     cancelPlacement: () => set({ placement: null }),
     setClipboard: (fragment) => set({ clipboard: fragment, pasteCount: 0 }),

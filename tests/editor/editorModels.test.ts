@@ -6,6 +6,7 @@ import { SELF_LOOP_MARGIN, selfLoopPath } from '@/editor/edges/wirePath';
 import { placementPosition, snapPoint } from '@/editor/placement';
 import {
   isEditableTarget,
+  isFileShortcut,
   NUDGE_LARGE_STEP,
   NUDGE_STEP,
   resolveNudge,
@@ -49,6 +50,19 @@ describe('горячие клавиши', () => {
   it('работают в русской раскладке: важна физическая клавиша, а не символ', () => {
     expect(resolveShortcut(key('KeyZ', { key: 'я', ctrlKey: true }))).toBe('undo');
     expect(resolveShortcut(key('KeyC', { key: 'с', ctrlKey: true }))).toBe('copy');
+  });
+
+  it('файл: Ctrl+S и Ctrl+O в любой раскладке, без Ctrl — не файловые', () => {
+    expect(resolveShortcut(key('KeyS', { key: 's', ctrlKey: true }))).toBe('save');
+    expect(resolveShortcut(key('KeyS', { key: 'ы', ctrlKey: true }))).toBe('save');
+    expect(resolveShortcut(key('KeyS', { key: 's', metaKey: true }))).toBe('save');
+    expect(resolveShortcut(key('KeyO', { key: 'щ', ctrlKey: true }))).toBe('open');
+    expect(resolveShortcut(key('KeyS', { key: 's' }))).toBeNull();
+    expect(resolveShortcut(key('KeyS', { key: 's', ctrlKey: true, altKey: true }))).toBeNull();
+    expect(isFileShortcut('save')).toBe(true);
+    expect(isFileShortcut('open')).toBe(true);
+    expect(isFileShortcut('copy')).toBe(false);
+    expect(isFileShortcut(null)).toBe(false);
   });
 
   it('справка: F1 и «?» в любой раскладке', () => {

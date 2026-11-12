@@ -33,6 +33,29 @@ function samePins(registry: ElementRegistry, a: CircuitComponent, b: CircuitComp
   return samePinLayout(pinsA, pinsB);
 }
 
+function sameComponent(a: CircuitComponent, b: CircuitComponent): boolean {
+  if (a === b) return true;
+  return (
+    a.id === b.id &&
+    a.type === b.type &&
+    a.position.x === b.position.x &&
+    a.position.y === b.position.y &&
+    (a.label ?? '') === (b.label ?? '') &&
+    (a.props === b.props || changedPropKeys(a.props, b.props).length === 0)
+  );
+}
+
+/**
+ * Совпадает ли содержимое двух схем — всё, что попадает в файл, с учётом порядка.
+ * Сначала сравниваются ссылки: неизменённая схема и снимки истории проверяются мгновенно.
+ */
+export function circuitsEqual(a: Circuit, b: Circuit): boolean {
+  if (a === b) return true;
+  if (a.components.length !== b.components.length) return false;
+  if (a.wires !== b.wires && !sameWires(a.wires, b.wires)) return false;
+  return a.components.every((component, i) => sameComponent(component, b.components[i]!));
+}
+
 export function classifyChange(prev: Circuit, next: Circuit, registry: ElementRegistry): CircuitChange {
   if (prev === next) return 'none';
   if (prev.wires !== next.wires && !sameWires(prev.wires, next.wires)) return 'structure';

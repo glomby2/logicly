@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { appStores } from '@/store/hooks';
-import { isEditableTarget, resolveNudge, resolveShortcut, type ShortcutAction } from '../shortcuts';
+import { isEditableTarget, isFileShortcut, resolveNudge, resolveShortcut, type ShortcutAction } from '../shortcuts';
 
-const ACTIONS: Readonly<Record<Exclude<ShortcutAction, 'escape'>, () => void>> = {
+const ACTIONS: Readonly<Record<Exclude<ShortcutAction, 'escape' | 'save' | 'open'>, () => void>> = {
   undo: () => appStores.circuit.getState().undo(),
   redo: () => appStores.circuit.getState().redo(),
   copy: () => appStores.commands.copySelection(),
@@ -15,7 +15,8 @@ const ACTIONS: Readonly<Record<Exclude<ShortcutAction, 'escape'>, () => void>> =
 };
 
 /**
- * Горячие клавиши редактора. Пока открыт диалог, работает только Esc (закрывает диалог).
+ * Горячие клавиши редактора (кроме файловых — их обрабатывает `features/file`).
+ * Пока открыт диалог, работает только Esc (закрывает диалог).
  * `onEscape` закрывает меню, режим размещения и снимает выделение.
  */
 export function useKeyboardShortcuts(onEscape: () => void) {
@@ -23,6 +24,8 @@ export function useKeyboardShortcuts(onEscape: () => void) {
     const handler = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return;
       const action = resolveShortcut(event);
+      // Ctrl+S и Ctrl+O обрабатывает features/file (useFileShortcuts).
+      if (isFileShortcut(action)) return;
       const dialogOpen = appStores.ui.getState().dialog !== null;
 
       if (dialogOpen) {

@@ -53,6 +53,39 @@ export async function dragBy(page: Page, locator: Locator, dx: number, dy: numbe
   await page.mouse.up();
 }
 
+/**
+ * Ждёт, пока выдвижная панель (палитра, инспектор) полностью откроется: она целиком в окне
+ * и CSS-переход завершён. `toBeInViewport` срабатывает уже при частичной видимости,
+ * и тап может прийтись на кнопку, которая ещё движется.
+ */
+export async function expectPanelOpen(panel: Locator) {
+  await expect(panel).toBeInViewport();
+  await expect
+    .poll(() =>
+      panel.evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        return rect.left >= -0.5 && rect.right <= window.innerWidth + 0.5 && el.getAnimations().length === 0;
+      }),
+    )
+    .toBe(true);
+}
+
+/**
+ * Ждёт, пока выдвижная панель полностью закроется: она целиком за краем окна и переход
+ * завершён. Тап по полю, пока панель уезжает, попадёт в неё, а не в поле.
+ */
+export async function expectPanelClosed(panel: Locator) {
+  await expect
+    .poll(() =>
+      panel.evaluate((el) => {
+        const rect = el.getBoundingClientRect();
+        const outside = rect.right <= 0.5 || rect.left >= window.innerWidth - 0.5 || rect.width === 0;
+        return outside && el.getAnimations().length === 0;
+      }),
+    )
+    .toBe(true);
+}
+
 export const compilations = async (page: Page) =>
   Number(await page.getByTestId('status-bar').getAttribute('data-compilations'));
 

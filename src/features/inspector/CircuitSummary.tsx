@@ -1,5 +1,6 @@
 import { useReactFlow } from '@xyflow/react';
 import { AlertTriangle, CheckCircle2, LocateFixed, Unplug } from 'lucide-react';
+import { DocumentSection } from '@/features/file/DocumentSection';
 import { ru } from '@/i18n/ru';
 import { appStores } from '@/store/hooks';
 import { InspectorSection } from './InspectorSection';
@@ -27,7 +28,12 @@ export function CircuitSummary({ model }: { model: CircuitModel }) {
   const show = useShowComponent();
 
   if (model.components === 0) {
-    return <p className="px-4 py-4 text-sm text-slate-400">{ru.inspector.empty}</p>;
+    return (
+      <>
+        <DocumentSection />
+        <p className="border-t border-slate-800 px-4 py-4 text-sm text-slate-400">{ru.inspector.empty}</p>
+      </>
+    );
   }
 
   return (
@@ -35,6 +41,7 @@ export function CircuitSummary({ model }: { model: CircuitModel }) {
       <div className="px-4 pt-4 pb-3 text-lg font-semibold text-slate-100" data-testid="inspector-title">
         {ru.inspector.circuit}
       </div>
+      <DocumentSection />
       <InspectorSection title={ru.inspector.circuit}>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
           <dt className="text-slate-500">{ru.inspector.elements}</dt>

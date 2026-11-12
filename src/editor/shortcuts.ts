@@ -8,7 +8,17 @@ export type ShortcutAction =
   | 'selectAll'
   | 'delete'
   | 'escape'
-  | 'help';
+  | 'help'
+  | 'save'
+  | 'open';
+
+/**
+ * Действия с файлами. Их выполняет интерфейс работы с файлами (`features/file`), а не
+ * редактор, и они срабатывают даже в поле ввода — иначе браузер откроет свой диалог.
+ */
+export function isFileShortcut(action: ShortcutAction | null): action is 'save' | 'open' {
+  return action === 'save' || action === 'open';
+}
 
 export interface KeyInput {
   readonly key: string;
@@ -27,6 +37,8 @@ const WITH_MODIFIER: Readonly<Record<string, ShortcutAction>> = {
   KeyV: 'paste',
   KeyD: 'duplicate',
   KeyA: 'selectAll',
+  KeyS: 'save',
+  KeyO: 'open',
 };
 
 export function resolveShortcut(input: KeyInput): ShortcutAction | null {

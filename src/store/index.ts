@@ -1,9 +1,9 @@
 export { createAppStores } from './appStores';
 export type { AppStores, AppStoresOptions } from './appStores';
-export { createCircuitStore, selectCanRedo, selectCanUndo } from './circuitStore';
-export type { CircuitStore, CircuitStoreState, ComponentMove, RemoveItems } from './circuitStore';
+export { createCircuitStore, selectCanRedo, selectCanUndo, selectIsDirty } from './circuitStore';
+export type { CircuitStore, CircuitStoreState, ComponentMove, LoadOptions, RemoveItems } from './circuitStore';
 export { createCommands, PASTE_OFFSET } from './commands';
-export type { AppCommands } from './commands';
+export type { AppCommands, DownloadFile, OpenDocumentResult, SaveDocumentResult } from './commands';
 export { emptyHistory, HISTORY_LIMIT, recordHistory, redoHistory, undoHistory } from './history';
 export { MAX_NOTIFICATIONS, pushNotification } from './notifications';
 export type { AppNotification, NotificationTone } from './notifications';
@@ -30,4 +30,4 @@ export type {
   SimulationStoreState,
 } from './simulationStore';
 export { createUiStore, EMPTY_SELECTION, selectIsSelected } from './uiStore';
-export type { DialogId, PanelId, Selection, ThemePreference, UiStore, UiStoreState } from './uiStore';
+export type { DialogId, PanelId, PendingDocument, Selection, ThemePreference, UiStore, UiStoreState } from './uiStore';

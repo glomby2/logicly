@@ -11,6 +11,8 @@ import {
   Undo2,
 } from 'lucide-react';
 import { IconButton } from '@/components/ui/IconButton';
+import { DocumentName } from '@/features/file/DocumentName';
+import { FileControls } from '@/features/file/FileControls';
 import { SimulationControls } from '@/features/simulation/SimulationControls';
 import { Separator } from '@/components/ui/Separator';
 import { ru } from '@/i18n/ru';
@@ -37,10 +39,16 @@ export function Toolbar() {
         onClick={() => ui.getState().togglePanel('palette')}
         data-testid="toggle-palette"
       />
-      <div className="mr-2 flex items-center gap-2 pl-1">
+      {/* На узком экране логотип скрыт, чтобы поместились кнопки файла; название — в инспекторе. */}
+      <div className="mr-2 flex items-center gap-2 pl-1 max-sm:hidden">
         <CircuitBoard className="size-5 text-emerald-400" aria-hidden />
-        <h1 className="hidden text-sm font-semibold text-slate-100 lg:block">{ru.app.title}</h1>
+        <h1 className="hidden text-sm font-semibold text-slate-100 xl:block">{ru.app.title}</h1>
       </div>
+      <div className="w-44 shrink-0 max-md:hidden lg:w-56">
+        <DocumentName testId="document-name" />
+      </div>
+      <Separator vertical className="max-sm:hidden" />
+      <FileControls />
       <Separator vertical />
       <IconButton label={`${ru.toolbar.undo} (Ctrl+Z)`} icon={Undo2} disabled={!canUndo} onClick={() => circuit.getState().undo()} data-testid="undo" />
       <IconButton label={`${ru.toolbar.redo} (Ctrl+Y)`} icon={Redo2} disabled={!canRedo} onClick={() => circuit.getState().redo()} data-testid="redo" />

@@ -1,4 +1,5 @@
-export type NotificationTone = 'info' | 'warning';
+/** `error` — действие не выполнено (например, файл отклонён); такое уведомление не скрывается само. */
+export type NotificationTone = 'info' | 'warning' | 'error';
 
 export interface AppNotification {
   readonly id: number;

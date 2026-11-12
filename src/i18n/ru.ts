@@ -1,4 +1,5 @@
 import type { ConnectionError } from '@/core/circuit';
+import { MAX_FILE_SIZE, type FileError, type FileErrorCode, type FileWarningCode } from '@/core/serialization';
 import type { ElementCategory } from '@/core/types/element';
 
 /** Строки интерфейса. Названия логических элементов (AND, OR, …) сюда не входят — они международные. */
@@ -98,6 +99,13 @@ export const ru = {
         ],
       },
       {
+        title: 'Файл',
+        items: [
+          ['Ctrl+S', 'Сохранить схему в файл'],
+          ['Ctrl+O', 'Открыть файл схемы'],
+        ],
+      },
+      {
         title: 'Выделение и перемещение',
         items: [
           ['Ctrl+A', 'Выделить всё'],
@@ -127,6 +135,49 @@ export const ru = {
     frequency: 'Частота шагов',
     hertz: (value: number) => `${value} Гц`,
     time: (value: number) => `t = ${value}`,
+  },
+  file: {
+    untitled: 'Без названия',
+    document: 'Документ',
+    name: 'Название схемы',
+    new: 'Новая схема',
+    open: 'Открыть файл (Ctrl+O)',
+    save: 'Сохранить в файл (Ctrl+S)',
+    openShort: 'Открыть',
+    saveShort: 'Сохранить',
+    unsaved: 'Есть несохранённые изменения',
+    saved: (fileName: string) => `Схема сохранена в файл «${fileName}»`,
+    loaded: (name: string) => `Открыта схема «${name}»`,
+    saveFailed: 'Не удалось сохранить файл: браузер не начал скачивание',
+    readFailed: 'Не удалось прочитать файл',
+    rejected: (reason: string) => `Файл не открыт: ${reason}`,
+    moreErrors: (count: number) => ` (и ещё ошибок: ${count})`,
+    errors: {
+      'unsupported-extension': () => 'поддерживаются только файлы .lsim и .json',
+      'too-large': () => `файл слишком большой (больше ${MAX_FILE_SIZE / (1024 * 1024)} МБ)`,
+      'invalid-json': () => 'файл повреждён или не является JSON',
+      'not-object': () => 'файл не является схемой',
+      'wrong-format': () => 'это не файл схемы Logic Sim',
+      'invalid-version': (e) => `неверная версия формата «${e.detail ?? ''}»`,
+      'unsupported-version': (e) =>
+        `файл создан более новой версией программы (версия формата ${e.detail ?? '?'})`,
+      'missing-field': (e) => `нет обязательного поля «${e.path ?? ''}»`,
+      'invalid-field': (e) => `неверное значение поля «${e.path ?? ''}»`,
+      'duplicate-component-id': (e) => `повторяется id элемента «${e.detail ?? ''}»`,
+      'duplicate-wire-id': (e) => `повторяется id провода «${e.detail ?? ''}»`,
+      'unknown-type': (e) => `неизвестный тип элемента «${e.detail ?? ''}»`,
+    } satisfies Record<FileErrorCode, (error: FileError) => string>,
+    warnings: {
+      'props-normalized': (count: number) => `Исправлены свойства элементов: ${count}`,
+      'invalid-label': (count: number) => `Удалены некорректные подписи: ${count}`,
+      'wires-removed': (count: number) => `Удалены недопустимые провода: ${count}`,
+    } satisfies Record<FileWarningCode, (count: number) => string>,
+    discard: {
+      title: 'Несохранённые изменения',
+      text: 'Текущая схема изменена и не сохранена. Если продолжить, изменения будут потеряны.',
+      confirm: 'Не сохранять',
+      cancel: 'Отмена',
+    },
   },
   notifications: {
     region: 'Уведомления',

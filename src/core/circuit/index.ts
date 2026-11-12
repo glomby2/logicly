@@ -3,7 +3,7 @@ export { extractFragment, insertFragment, instantiateFragment } from './fragment
 export type { CircuitFragment } from './fragment';
 export { nextLabel } from './labels';
 export type { ConnectionCheck, ConnectionError } from './connections';
-export { changedPropKeys, classifyChange } from './diff';
+export { changedPropKeys, circuitsEqual, classifyChange } from './diff';
 export type { CircuitChange } from './diff';
 export {
   addComponent,
