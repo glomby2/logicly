@@ -1,5 +1,5 @@
 import { useReactFlow } from '@xyflow/react';
-import { AlertTriangle, CheckCircle2, LocateFixed, Unplug } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, LocateFixed, Table2, Unplug } from 'lucide-react';
 import { DocumentSection } from '@/features/file/DocumentSection';
 import { ru } from '@/i18n/ru';
 import { appStores } from '@/store/hooks';
@@ -49,6 +49,15 @@ export function CircuitSummary({ model }: { model: CircuitModel }) {
           <dt className="text-slate-500">{ru.inspector.wires}</dt>
           <dd className="text-slate-200">{model.wires}</dd>
         </dl>
+        <button
+          type="button"
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-slate-700 px-2 py-1.5 text-xs text-slate-200 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-500"
+          onClick={() => appStores.ui.getState().openDialog('truth-table')}
+          data-testid="inspector-truth-table"
+        >
+          <Table2 className="size-3.5" aria-hidden />
+          {ru.truthTable.open}
+        </button>
       </InspectorSection>
       <InspectorSection title={ru.inspector.issues}>
         {model.issues.length === 0 ? (

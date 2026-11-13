@@ -86,6 +86,53 @@ export async function expectPanelClosed(panel: Locator) {
     .toBe(true);
 }
 
+/** Описание элемента для файла схемы в сценариях: `['A', 'INPUT', x, y, 'подпись', props?]`. */
+export type FileComponentSpec = readonly [
+  id: string,
+  type: string,
+  x: number,
+  y: number,
+  label?: string,
+  props?: Record<string, number | boolean>,
+];
+
+const GATES = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR'];
+const defaultProps = (type: string): Record<string, number | boolean> =>
+  type === 'INPUT' ? { value: false } : GATES.includes(type) ? { inputCount: 2 } : {};
+
+/** Документ `.lsim`: элементы и провода `'A' → 'G.in1'` (выход по умолчанию `out0`, вход — `in0`). */
+export function circuitFile(name: string, components: readonly FileComponentSpec[], wires: readonly [string, string][]) {
+  const ref = (spec: string, defaultPin: string) => {
+    const [componentId, pinId = defaultPin] = spec.split('.');
+    return { componentId, pinId };
+  };
+  return {
+    format: 'logic-sim',
+    version: 1,
+    name,
+    components: components.map(([id, type, x, y, label, props]) => ({
+      id,
+      type,
+      position: { x, y },
+      ...(label ? { label } : {}),
+      // Полные свойства, как их сохраняет редактор: иначе загрузка сообщит о нормализации.
+      props: { ...defaultProps(type), ...props },
+    })),
+    wires: wires.map(([from, to], i) => ({ id: `w${i + 1}`, from: ref(from, 'out0'), to: ref(to, 'in0') })),
+  };
+}
+
+/** Открывает схему через «Открыть» (или другой `trigger`) и системный выбор файла. */
+export async function openCircuit(page: Page, document: unknown, trigger?: () => Promise<void>) {
+  const chooser = page.waitForEvent('filechooser');
+  await (trigger ? trigger() : page.getByTestId('file-open').click());
+  await (await chooser).setFiles({
+    name: 'circuit.lsim',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(document)),
+  });
+}
+
 export const compilations = async (page: Page) =>
   Number(await page.getByTestId('status-bar').getAttribute('data-compilations'));
 

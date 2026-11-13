@@ -12,6 +12,7 @@ export const OUTPUT: ElementDefinition<NoProps> = {
   category: 'io',
   defaultProps: {},
   labelPrefix: 'Y',
+  port: { kind: 'output' },
   pins: () => PINS,
   evaluate: () => ({ outputs: [] }),
 };

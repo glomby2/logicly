@@ -35,6 +35,17 @@ export type PropSpec =
       readonly kind: 'boolean';
     };
 
+/**
+ * Роль элемента как внешнего вывода схемы — для анализа (таблицы истинности):
+ * - `input` — источник сигнала, который задаётся логическим свойством `prop`
+ *   (единственный выход равен 1, когда свойство истинно);
+ * - `output` — индикатор; его значение — сигнал на первом входе.
+ * Анализ находит входы и выходы схемы по этой роли, а не по типу элемента.
+ */
+export type ElementPort =
+  | { readonly kind: 'input'; readonly prop: string }
+  | { readonly kind: 'output' };
+
 export interface EvalContext<P, S> {
   /** Значения входов в порядке `pins().inputs`. Неподключённый вход равен 0. */
   readonly inputs: readonly Signal[];
@@ -80,6 +91,8 @@ export interface ElementDefinition<P extends ElementProps = ElementProps, S = un
   readonly interactiveProps?: readonly string[];
   /** Префикс автоматической подписи нового экземпляра: `X` → X1, X2, … Без префикса подписи нет. */
   readonly labelPrefix?: string;
+  /** Внешний вход или выход схемы (INPUT, OUTPUT). Используется таблицей истинности. */
+  readonly port?: ElementPort;
   pins(props: P): ElementPins;
   initialState?(props: P): S;
   evaluate(context: EvalContext<P, S>): EvalResult<S>;

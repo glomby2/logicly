@@ -25,11 +25,12 @@ export function ContextMenu({ menu, onCommand, onClose }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [renaming, setRenaming] = useState(false);
   const canPaste = useUiStore((s) => s.clipboard !== null);
+  const isEmpty = useCircuitStore((s) => s.circuit.components.length === 0);
   const component = useCircuitStore((s) =>
     menu.target.kind === 'node' ? findComponent(s.circuit, menu.target.id) : undefined,
   );
   const definition = component ? appStores.registry.get(component.type) : undefined;
-  const entries = buildContextMenu(menu.target, { canPaste, component, definition });
+  const entries = buildContextMenu(menu.target, { canPaste, isEmpty, component, definition });
 
   useEffect(() => {
     const close = (event: PointerEvent) => {

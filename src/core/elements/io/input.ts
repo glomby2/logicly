@@ -14,6 +14,7 @@ export const INPUT: ElementDefinition<InputProps> = {
   defaultProps: { value: false },
   interactiveProps: ['value'],
   labelPrefix: 'X',
+  port: { kind: 'input', prop: 'value' },
   pins: () => PINS,
   evaluate: ({ props }) => ({ outputs: [fromBoolean(props.value)] }),
 };

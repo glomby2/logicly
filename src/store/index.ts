@@ -1,9 +1,9 @@
 export { createAppStores } from './appStores';
 export type { AppStores, AppStoresOptions } from './appStores';
 export { createCircuitStore, selectCanRedo, selectCanUndo, selectIsDirty } from './circuitStore';
-export type { CircuitStore, CircuitStoreState, ComponentMove, LoadOptions, RemoveItems } from './circuitStore';
+export type { CircuitStore, CircuitStoreState, ComponentMove, LoadOptions, PropsUpdate, RemoveItems } from './circuitStore';
 export { createCommands, PASTE_OFFSET } from './commands';
-export type { AppCommands, DownloadFile, OpenDocumentResult, SaveDocumentResult } from './commands';
+export type { AppCommands, DownloadFile, InputValue, OpenDocumentResult, SaveDocumentResult } from './commands';
 export { emptyHistory, HISTORY_LIMIT, recordHistory, redoHistory, undoHistory } from './history';
 export { MAX_NOTIFICATIONS, pushNotification } from './notifications';
 export type { AppNotification, NotificationTone } from './notifications';

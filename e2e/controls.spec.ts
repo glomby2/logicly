@@ -85,6 +85,8 @@ test.describe('мышь и клавиатура', () => {
     const dialog = page.getByTestId('shortcuts-dialog');
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText('Ctrl+Z');
+    // Обычная ширина диалога (max-w-lg): вариант `wide` только у таблицы истинности.
+    expect((await dialog.boundingBox())!.width).toBeLessThanOrEqual(512);
     await page.keyboard.press('Delete');
     await expect(nodesOfType(page, 'AND')).toHaveCount(1);
     await page.keyboard.press('Escape');

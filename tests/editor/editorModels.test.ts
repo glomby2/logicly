@@ -94,8 +94,14 @@ describe('контекстное меню', () => {
       'paste:off',
       'selectAll',
       'fitView',
+      'truthTable',
     ]);
     expect(commands(buildContextMenu({ kind: 'pane', flowPosition: { x: 0, y: 0 } }, { canPaste: true }))[0]).toBe('paste');
+  });
+
+  it('поле: таблица истинности недоступна для пустой схемы', () => {
+    const entries = buildContextMenu({ kind: 'pane', flowPosition: { x: 0, y: 0 } }, { canPaste: false, isEmpty: true });
+    expect(commands(entries).at(-1)).toBe('truthTable:off');
   });
 
   it('провод: только удаление', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INPUT, OUTPUT } from '@/core/elements';
+import { BUILTIN_ELEMENTS, INPUT, OUTPUT } from '@/core/elements';
 
 describe('INPUT', () => {
   it('выдаёт значение свойства value', () => {
@@ -19,5 +19,16 @@ describe('OUTPUT', () => {
     expect(OUTPUT.pins({})).toEqual({ inputs: [{ id: 'in0' }], outputs: [] });
     expect(OUTPUT.evaluate({ inputs: [1], props: {}, state: undefined }).outputs).toEqual([]);
     expect(OUTPUT.category).toBe('io');
+  });
+});
+
+describe('роли внешних выводов', () => {
+  it('INPUT — вход по свойству value, OUTPUT — выход', () => {
+    expect(INPUT.port).toEqual({ kind: 'input', prop: 'value' });
+    expect(OUTPUT.port).toEqual({ kind: 'output' });
+  });
+
+  it('у вентилей роли нет', () => {
+    for (const definition of BUILTIN_ELEMENTS.filter((d) => d.category === 'gates')) expect(definition.port).toBeUndefined();
   });
 });

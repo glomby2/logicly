@@ -89,6 +89,25 @@ describe.each(CHECKED_ELEMENTS.map((d) => [d.type, d] as const))('контрак
     }
   });
 
+  it('роль внешнего вывода (port) согласована с пинами и evaluate', () => {
+    const { port } = definition;
+    if (!port) return;
+    const props = resolveProps(definition);
+    if (port.kind === 'output') {
+      expect(definition.pins(props).inputs.length).toBeGreaterThan(0);
+      return;
+    }
+    // Вход: логическое свойство задаёт единственный выход, входных пинов нет.
+    expect(typeof definition.defaultProps[port.prop]).toBe('boolean');
+    expect(definition.pins(props).inputs).toHaveLength(0);
+    expect(definition.pins(props).outputs).toHaveLength(1);
+    for (const value of [false, true]) {
+      const state = definition.initialState?.(props);
+      const outputs = definition.evaluate({ inputs: [], props: { ...props, [port.prop]: value }, state }).outputs;
+      expect(outputs).toEqual([value ? 1 : 0]);
+    }
+  });
+
   it('вычисление идемпотентно: повтор с новым состоянием и теми же входами даёт те же выходы', () => {
     for (const props of propVariants(definition)) {
       const all = ternaryCombinations(definition.pins(props).inputs.length);

@@ -43,6 +43,11 @@ export interface ComponentMove {
   readonly position: Point;
 }
 
+export interface PropsUpdate {
+  readonly id: ComponentId;
+  readonly patch: ElementProps;
+}
+
 export interface RemoveItems {
   readonly components?: Iterable<ComponentId>;
   readonly wires?: Iterable<WireId>;
@@ -82,6 +87,12 @@ export interface CircuitStoreState {
   /** Пустая подпись удаляет её. */
   renameComponent(id: ComponentId, label: string): void;
   updateProps(id: ComponentId, patch: ElementProps): void;
+  /**
+   * Меняет свойства нескольких элементов одним изменением схемы: симуляция пересчитывается
+   * один раз, без промежуточных состояний. В историю не пишется, если меняются только
+   * интерактивные свойства (положения INPUT).
+   */
+  updateManyProps(updates: readonly PropsUpdate[]): void;
   /** Соединяет два пина в любом порядке. Возвращает результат проверки — UI может показать причину отказа. */
   connect(a: PinRef, b: PinRef): ConnectionCheck;
   /** Переподключает провод к другим пинам, сохраняя его id. Недопустимое соединение ничего не меняет. */
@@ -225,6 +236,24 @@ export function createCircuitStore({
         if (keys.length === 0) return;
         const interactive = registry.get(component.type)?.interactiveProps ?? [];
         commit(next, !keys.every((key) => interactive.includes(key)));
+      },
+
+      updateManyProps(updates) {
+        const { circuit } = get();
+        let next = circuit;
+        for (const { id, patch } of updates) {
+          if (findComponent(next, id)) next = updateComponentProps(next, registry, id, patch);
+        }
+        // Итог сравнивается с исходной схемой, а не по шагам: повтор id, вернувший значение,
+        // не даёт ни изменения, ни шага истории.
+        if (classifyChange(circuit, next, registry) === 'none') return;
+        const recordable = next.components.some((component, i) => {
+          const before = circuit.components[i]!;
+          if (component === before) return false;
+          const interactive = registry.get(component.type)?.interactiveProps ?? [];
+          return changedPropKeys(before.props, component.props).some((key) => !interactive.includes(key));
+        });
+        commit(next, recordable);
       },
 
       connect(a, b) {

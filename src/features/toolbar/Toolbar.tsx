@@ -7,6 +7,7 @@ import {
   PanelLeft,
   PanelRight,
   Redo2,
+  Table2,
   Trash2,
   Undo2,
 } from 'lucide-react';
@@ -59,6 +60,15 @@ export function Toolbar() {
       <IconButton label={`${ru.toolbar.delete} (Del)`} icon={Trash2} disabled={!hasSelection} onClick={() => commands.deleteSelection()} data-testid="delete" />
       <Separator vertical className="hidden sm:block" />
       <IconButton label={ru.toolbar.clear} icon={Eraser} disabled={isEmpty} onClick={() => commands.clearAll()} className="max-sm:hidden" />
+      {/* На узком экране таблица истинности открывается из инспектора. */}
+      <IconButton
+        label={ru.truthTable.open}
+        icon={Table2}
+        disabled={isEmpty}
+        onClick={() => ui.getState().openDialog('truth-table')}
+        className="max-sm:hidden"
+        data-testid="open-truth-table"
+      />
       <div className="ml-auto flex items-center gap-1">
         <SimulationControls />
         <Separator vertical />

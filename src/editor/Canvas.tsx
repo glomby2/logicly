@@ -185,6 +185,9 @@ export function Canvas() {
         case 'fitView':
           void fitView(FIT_VIEW_OPTIONS);
           break;
+        case 'truthTable':
+          uiStore.getState().openDialog('truth-table');
+          break;
         case 'copy':
           commands.copySelection();
           break;

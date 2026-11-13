@@ -7,7 +7,17 @@ export type MenuTarget =
   | { readonly kind: 'node'; readonly id: ComponentId }
   | { readonly kind: 'edge'; readonly id: WireId };
 
-export type MenuCommand = 'paste' | 'selectAll' | 'fitView' | 'copy' | 'cut' | 'duplicate' | 'delete' | 'toggle' | 'rename';
+export type MenuCommand =
+  | 'paste'
+  | 'selectAll'
+  | 'fitView'
+  | 'truthTable'
+  | 'copy'
+  | 'cut'
+  | 'duplicate'
+  | 'delete'
+  | 'toggle'
+  | 'rename';
 
 export type MenuEntry =
   | {
@@ -24,6 +34,8 @@ export type MenuEntry =
 
 export interface MenuContext {
   readonly canPaste: boolean;
+  /** Схема пуста — таблицу истинности строить не из чего. */
+  readonly isEmpty?: boolean;
   /** Элемент под курсором (для меню узла). */
   readonly component?: CircuitComponent;
   readonly definition?: ElementDefinition;
@@ -45,6 +57,7 @@ export function buildContextMenu(target: MenuTarget, context: MenuContext): Menu
         command('selectAll', ru.menu.selectAll, { shortcut: 'Ctrl+A' }),
         SEPARATOR,
         command('fitView', ru.menu.fitView),
+        command('truthTable', ru.truthTable.open, { disabled: context.isEmpty === true }),
       ];
     case 'edge':
       return [command('delete', ru.menu.deleteWire, { shortcut: 'Del', danger: true })];

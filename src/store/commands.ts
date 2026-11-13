@@ -28,6 +28,13 @@ export type SaveDocumentResult =
   | { readonly ok: true; readonly fileName: string }
   | { readonly ok: false; readonly error: unknown };
 
+/** Значение логического свойства, задающего внешний вход схемы (`port.prop` у INPUT). */
+export interface InputValue {
+  readonly componentId: ComponentId;
+  readonly prop: string;
+  readonly value: boolean;
+}
+
 /** Запускает скачивание файла. Исключение означает, что скачивание не началось. */
 export type DownloadFile = (fileName: string, text: string) => void;
 
@@ -52,6 +59,11 @@ export interface AppCommands {
   saveDocument(download: DownloadFile, fallbackName: string): SaveDocumentResult;
   /** Переименовывает документ (не записывается в историю undo/redo). */
   renameDocument(name: string): void;
+  /**
+   * Устанавливает комбинацию на входах схемы (строка таблицы истинности): все значения
+   * меняются одним изменением — один пересчёт симуляции, без записи в историю.
+   */
+  applyInputCombination(values: readonly InputValue[]): void;
   /** Удаляет выделенные элементы (с их проводами) и провода. */
   deleteSelection(): void;
   /** Размещает элемент с автоматической подписью (если она задана типом), выделяет его и завершает режим размещения. */
@@ -149,6 +161,10 @@ export function createCommands({
     },
 
     renameDocument: (name) => circuit.getState().renameDocument(name),
+
+    applyInputCombination(values) {
+      circuit.getState().updateManyProps(values.map((v) => ({ id: v.componentId, patch: { [v.prop]: v.value } })));
+    },
 
     deleteSelection() {
       const { selection } = ui.getState();

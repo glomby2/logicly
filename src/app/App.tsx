@@ -12,6 +12,7 @@ import { Notifications } from '@/features/notifications/Notifications';
 import { Palette } from '@/features/palette/Palette';
 import { PlacementHint } from '@/features/palette/PlacementHint';
 import { StatusBar } from '@/features/status/StatusBar';
+import { TruthTableDialog } from '@/features/truthTable/TruthTableDialog';
 import { Toolbar } from '@/features/toolbar/Toolbar';
 import { appStores, useUiStore } from '@/store/hooks';
 
@@ -48,6 +49,7 @@ export function App() {
         <Notifications />
         <ShortcutsDialog />
         <DiscardChangesDialog />
+        <TruthTableDialog />
       </div>
     </ReactFlowProvider>
   );
