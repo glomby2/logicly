@@ -137,7 +137,7 @@ describe('открытие файла', () => {
     ['неподдерживаемое расширение', 'x.txt', latchText(), 'unsupported-extension'],
     ['неверный JSON', 'x.lsim', '{', 'invalid-json'],
     ['версия новее', 'x.lsim', latchText().replace('"version": 1', '"version": 99'), 'unsupported-version'],
-    ['неизвестный тип', 'x.lsim', latchText().replaceAll('"NOR"', '"MUX"'), 'unknown-type'],
+    ['неизвестный тип', 'x.lsim', latchText().replaceAll('"NOR"', '"UNKNOWN_ELEMENT"'), 'unknown-type'],
     ['повтор id', 'x.lsim', latchText().replace('"id": "R"', '"id": "S"'), 'duplicate-component-id'],
   ])('отклонённый файл (%s) ничего не меняет', (_, fileName, text, code) => {
     const t = setup();

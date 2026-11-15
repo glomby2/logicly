@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AND, NOT, createDefaultRegistry, INPUT, OUTPUT } from '@/core/elements';
+import { AND, DEMUX, MUX, NOT, createDefaultRegistry, INPUT, OUTPUT } from '@/core/elements';
 import { computeGeometry, PIN_PITCH } from '@/editor/layout/geometry';
 
 const registry = createDefaultRegistry();
@@ -29,6 +29,57 @@ describe('computeGeometry: INPUT и OUTPUT', () => {
     expect(input.pins).toEqual([{ id: 'out0', direction: 'output', side: 'right', x: input.width, y: input.height / 2 }]);
     const output = computeGeometry('output', OUTPUT.pins({}));
     expect(output.pins).toEqual([{ id: 'in0', direction: 'input', side: 'left', x: 0, y: output.height / 2 }]);
+  });
+});
+
+describe('computeGeometry: MUX и DEMUX', () => {
+  const geometryOf = (definition: typeof MUX, selectBits: number) => computeGeometry('mux', definition.pins({ selectBits }));
+  const byId = (geometry: ReturnType<typeof geometryOf>) => Object.fromEntries(geometry.pins.map((p) => [p.id, p]));
+
+  it.each([
+    [1, 60],
+    [2, 100],
+    [3, 180],
+  ])('MUX, %i входа выбора: данные слева на шаге сетки, Y по центру справа, S снизу', (bits, height) => {
+    const geometry = geometryOf(MUX, bits);
+    const pins = byId(geometry);
+    const count = 2 ** bits;
+    expect(geometry).toMatchObject({ kind: 'mux', width: 80, height });
+    for (let i = 0; i < count; i++) {
+      expect(pins[`d${i}`]).toMatchObject({ direction: 'input', side: 'left', x: 0, y: (i + 1) * PIN_PITCH, label: `D${i}` });
+    }
+    expect(pins.y).toMatchObject({ direction: 'output', side: 'right', x: geometry.width, y: height / 2, label: 'Y' });
+    const select = Array.from({ length: bits }, (_, i) => pins[`s${i}`]!);
+    expect(select.every((p) => p.side === 'bottom' && p.y === height && p.direction === 'input')).toBe(true);
+    // Входы выбора по центру нижней стороны с шагом сетки, s0 — левее.
+    const xs = select.map((p) => p.x);
+    expect(xs.map((x, i) => (i === 0 ? 0 : x - xs[i - 1]!))).toEqual([0, ...Array(bits - 1).fill(PIN_PITCH)]);
+    expect((xs[0]! + xs.at(-1)!) / 2).toBe(geometry.width / 2);
+  });
+
+  it.each([1, 2, 3])('DEMUX, %i входа выбора: D по центру слева, выходы справа на шаге сетки', (bits) => {
+    const geometry = geometryOf(DEMUX, bits);
+    const pins = byId(geometry);
+    expect(geometry.height).toBe((2 ** bits + 1) * PIN_PITCH);
+    expect(pins.d).toMatchObject({ direction: 'input', side: 'left', x: 0, y: geometry.height / 2 });
+    for (let i = 0; i < 2 ** bits; i++) {
+      expect(pins[`y${i}`]).toMatchObject({ direction: 'output', side: 'right', x: geometry.width, y: (i + 1) * PIN_PITCH });
+    }
+    expect(Array.from({ length: bits }, (_, i) => pins[`s${i}`]!.side)).toEqual(Array(bits).fill('bottom'));
+  });
+
+  it('пины не выходят за границы узла', () => {
+    for (const definition of [MUX, DEMUX]) {
+      for (const bits of [1, 2, 3]) {
+        const geometry = geometryOf(definition, bits);
+        for (const pin of geometry.pins) {
+          expect(pin.x).toBeGreaterThanOrEqual(0);
+          expect(pin.x).toBeLessThanOrEqual(geometry.width);
+          expect(pin.y).toBeGreaterThanOrEqual(0);
+          expect(pin.y).toBeLessThanOrEqual(geometry.height);
+        }
+      }
+    }
   });
 });
 

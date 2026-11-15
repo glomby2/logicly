@@ -189,6 +189,46 @@ describe('схемы с памятью', () => {
   });
 });
 
+describe('MUX и DEMUX', () => {
+  it('MUX 2:1: Y = D[S]', () => {
+    const b = new CircuitBuilder().input('D0').input('D1').input('S').add('M', 'MUX', { selectBits: 1 });
+    b.wire('D0', 'M.d0').wire('D1', 'M.d1').wire('S', 'M.s0').output('Y').wire('M.y', 'Y');
+    const t = table(observe(b));
+    expect(labels(t)).toEqual([['D0', 'D1', 'S'], ['Y']]);
+    expect(rows(t)).toEqual(['000|0', '001|0', '010|0', '011|1', '100|1', '101|0', '110|1', '111|1']);
+    expect(t.warnings).toEqual([]);
+  });
+
+  it('DEMUX 1:2: D на выход по адресу, второй выход 0', () => {
+    const b = new CircuitBuilder().input('D').input('S').add('X', 'DEMUX', { selectBits: 1 });
+    b.wire('D', 'X.d').wire('S', 'X.s0').output('Y0').output('Y1').wire('X.y0', 'Y0').wire('X.y1', 'Y1');
+    const t = table(observe(b));
+    expect(labels(t)).toEqual([['D', 'S'], ['Y0', 'Y1']]);
+    expect(rows(t)).toEqual(['00|0 0', '01|0 0', '10|1 0', '11|0 1']);
+  });
+
+  it('MUX 4:1: все 64 комбинации совпадают с эталоном', () => {
+    const b = new CircuitBuilder().add('M', 'MUX', { selectBits: 2 });
+    // Подписи A…F задают порядок столбцов: D0…D3, затем S0, S1.
+    const pins = ['d0', 'd1', 'd2', 'd3', 's0', 's1'];
+    pins.forEach((pinId, i) => b.input(String.fromCharCode(65 + i)).wire(String.fromCharCode(65 + i), `M.${pinId}`));
+    const t = table(observe(b.output('Y').wire('M.y', 'Y')));
+    expect(t.rows).toHaveLength(64);
+    for (const row of t.rows) {
+      const [d0, d1, d2, d3, s0, s1] = row.inputs;
+      expect(row.outputs, row.inputs.join('')).toEqual([{ kind: 'value', value: [d0, d1, d2, d3][s0! + 2 * s1!] }]);
+    }
+  });
+
+  it('D-защёлка на элементе MUX (Y → D0, D → D1, E → S): E = 0 — хранение, E = 1 — Q = D', () => {
+    const b = new CircuitBuilder().input('D').input('E').add('M', 'MUX', { selectBits: 1 });
+    b.wire('M.y', 'M.d0').wire('D', 'M.d1').wire('E', 'M.s0').output('Q').wire('M.y', 'Q');
+    const t = table(observe(b));
+    expect(rows(t)).toEqual(['00|↺0', '01|0', '10|↺0', '11|1']);
+    expect(t.warnings).toEqual([{ code: 'memory', count: 2 }]);
+  });
+});
+
 describe('неопределённые значения X', () => {
   it('NOT на себя — X, строка нестабильна', () => {
     const t = table(observe(new CircuitBuilder().gate('N', 'NOT').wire('N', 'N'), 'N'));

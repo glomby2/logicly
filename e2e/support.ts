@@ -97,8 +97,15 @@ export type FileComponentSpec = readonly [
 ];
 
 const GATES = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR'];
+const SELECTORS = ['MUX', 'DEMUX'];
 const defaultProps = (type: string): Record<string, number | boolean> =>
-  type === 'INPUT' ? { value: false } : GATES.includes(type) ? { inputCount: 2 } : {};
+  type === 'INPUT'
+    ? { value: false }
+    : GATES.includes(type)
+      ? { inputCount: 2 }
+      : SELECTORS.includes(type)
+        ? { selectBits: 1 }
+        : {};
 
 /** Документ `.lsim`: элементы и провода `'A' → 'G.in1'` (выход по умолчанию `out0`, вход — `in0`). */
 export function circuitFile(name: string, components: readonly FileComponentSpec[], wires: readonly [string, string][]) {

@@ -1,6 +1,7 @@
 import type { Signal } from '@/core/logic/signal';
 import type { ElementGeometry } from '../layout/geometry';
 import { signalColor } from '../signalStyle';
+import { SELECTED_FILTER, SYMBOL_FILL, SYMBOL_STROKE } from './symbolStyle';
 import {
   backEdgeX,
   backExtension,
@@ -24,8 +25,6 @@ interface GateSymbolProps {
   readonly className?: string;
 }
 
-const STROKE = '#cbd5e1';
-
 /** ANSI-символ вентиля: входные линии, корпус, кружок инверсии и выходная линия. */
 export function GateSymbol({
   symbol,
@@ -41,8 +40,8 @@ export function GateSymbol({
   const extension = backExtension(box, inputs.map((pin) => pin.y));
   const active = output === 1;
   const outColor = signalColor(output);
-  const bodyStroke = output === 0 ? STROKE : outColor;
-  const fill = active ? 'rgba(52, 211, 153, 0.14)' : output === 'X' ? 'rgba(251, 191, 36, 0.12)' : '#1e293b';
+  const bodyStroke = output === 0 ? SYMBOL_STROKE : outColor;
+  const fill = active ? 'rgba(52, 211, 153, 0.14)' : output === 'X' ? 'rgba(251, 191, 36, 0.12)' : SYMBOL_FILL;
   const { cx, cy } = bubbleCenter(box);
 
   return (
@@ -51,10 +50,10 @@ export function GateSymbol({
       height={height * scale}
       viewBox={`0 0 ${width} ${height}`}
       className={className}
-      style={selected ? { filter: 'drop-shadow(0 0 4px #38bdf8)' } : undefined}
+      style={selected ? { filter: SELECTED_FILTER } : undefined}
       aria-hidden
     >
-      <g stroke={STROKE} strokeWidth={2} strokeLinecap="round" fill="none">
+      <g stroke={SYMBOL_STROKE} strokeWidth={2} strokeLinecap="round" fill="none">
         {inputs.map((pin) => (
           <line key={pin.id} x1={0} y1={pin.y} x2={backEdgeX(symbol, box, pin.y)} y2={pin.y} />
         ))}

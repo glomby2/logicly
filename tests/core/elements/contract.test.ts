@@ -11,17 +11,74 @@ import { TEST_CLOCK, TEST_DFF } from '../../helpers/fixtureElements';
  * в том числе для будущих. Новый элемент автоматически проверяется этими тестами.
  */
 
-/** Варианты свойств: по умолчанию и, для целых свойств, граничные значения. */
+/** Варианты свойств: по умолчанию и каждое допустимое значение каждого целого свойства. */
 function propVariants(definition: ElementDefinition): ElementProps[] {
   const variants: ElementProps[] = [resolveProps(definition)];
   for (const spec of definition.propSchema ?? []) {
     if (spec.kind !== 'integer') continue;
-    // Перебор 3^n комбинаций входов: ограничиваем n, чтобы тест оставался быстрым.
-    const max = Math.min(spec.max, 4);
-    variants.push(resolveProps(definition, { [spec.key]: spec.min }), resolveProps(definition, { [spec.key]: max }));
+    for (let value = spec.min; value <= spec.max; value++) {
+      variants.push(resolveProps(definition, { [spec.key]: value }));
+    }
   }
   return variants;
 }
+
+/** До такого числа входов монотонность дополнительно проверяется перебором всех пар наборов (9ⁿ). */
+const PAIRWISE_LIMIT = 4;
+
+/** Набор с i-м входом, заменённым на X. */
+const withUnknown = (values: readonly Signal[], i: number): Signal[] => values.map((v, j) => (j === i ? 'X' : v));
+
+type Run = (values: readonly Signal[]) => readonly Signal[];
+
+/** Первое нарушение «каждый выход для `approx` равен X или выходу для `exact`»; `null` — нарушений нет. */
+function refinementViolation(approx: readonly Signal[], exact: readonly Signal[], message: string): string | null {
+  const i = approx.findIndex((value, k) => value !== 'X' && value !== exact[k]);
+  return i < 0 ? null : `${message}, выход ${i}: ${approx[i]} вместо X или ${exact[i]}`;
+}
+
+/*
+ * Монотонность по X: если набор `vague` получен из `precise` заменой части входов на X,
+ * каждый выход для `vague` равен X или выходу для `precise`.
+ *
+ * Достаточно проверить замену одного входа: любой `vague` получается из `precise`
+ * цепочкой одиночных замен, а отношение «равен X или совпадает» транзитивно.
+ * Это 3ⁿ·n вычислений вместо 9ⁿ, поэтому проверяются все значения свойств
+ * (MUX 8:1 — 11 входов). Для малых n дополнительно перебираются все пары наборов.
+ */
+function monotonicityViolation(run: Run, inputCount: number): string | null {
+  const all = ternaryCombinations(inputCount);
+  for (const precise of all) {
+    const result = run(precise);
+    for (let i = 0; i < precise.length; i++) {
+      if (precise[i] === 'X') continue;
+      const violation = refinementViolation(run(withUnknown(precise, i)), result, `${precise} → вход ${i} = X`);
+      if (violation) return violation;
+    }
+    if (inputCount > PAIRWISE_LIMIT) continue;
+    for (const vague of all) {
+      if (!refines(precise, vague)) continue;
+      const violation = refinementViolation(run(vague), result, `${precise} → ${vague}`);
+      if (violation) return violation;
+    }
+  }
+  return null;
+}
+
+describe('проверка монотонности', () => {
+  it('находит нарушение, которое проявляется только при двух X, и без перебора пар', () => {
+    // 1 ровно при двух X, иначе 0: из 000000 через X00000 в XX0000 значение 0 меняется на 1.
+    const broken: Run = (values) => [values.filter((v) => v === 'X').length === 2 ? 1 : 0];
+    expect(PAIRWISE_LIMIT).toBeLessThan(6);
+    expect(monotonicityViolation(broken, 6)).toMatch(/выход 0: 1 вместо X или 0/);
+  });
+
+  it('не находит нарушений у монотонной функции', () => {
+    const and: Run = (values) => [values.includes(0) ? 0 : values.includes('X') ? 'X' : 1];
+    expect(monotonicityViolation(and, 6)).toBeNull();
+    expect(monotonicityViolation(and, 3)).toBeNull();
+  });
+});
 
 /** Начальное состояние и состояния после одного вычисления и одного тика из него. */
 function reachableStates(definition: ElementDefinition, props: ElementProps): unknown[] {
@@ -67,24 +124,16 @@ describe.each(CHECKED_ELEMENTS.map((d) => [d.type, d] as const))('контрак
   it('число выходов evaluate совпадает с pins().outputs, вычисление детерминировано и монотонно по X', () => {
     for (const props of propVariants(definition)) {
       const { inputs, outputs } = definition.pins(props);
-      const all = ternaryCombinations(inputs.length);
 
       for (const state of reachableStates(definition, props)) {
-        const run = (values: readonly Signal[]) => definition.evaluate({ inputs: values, props, state }).outputs;
-
-        for (const precise of all) {
-          const result = run(precise);
-          expect(result).toHaveLength(outputs.length);
-          expect(run(precise)).toEqual(result);
-
-          for (const vague of all) {
-            if (!refines(precise, vague)) continue;
-            const approx = run(vague);
-            approx.forEach((value, i) => {
-              expect(value === 'X' || value === result[i], `${precise} → ${vague}, выход ${i}`).toBe(true);
-            });
-          }
+        const run: Run = (values) => definition.evaluate({ inputs: values, props, state }).outputs;
+        for (const values of ternaryCombinations(inputs.length)) {
+          const result = run(values);
+          if (result.length !== outputs.length) expect(result, `${values}`).toHaveLength(outputs.length);
+          const again = run(values);
+          if (again.some((v, i) => v !== result[i])) expect(again, `${values}`).toEqual(result);
         }
+        expect(monotonicityViolation(run, inputs.length), JSON.stringify(props)).toBeNull();
       }
     }
   });
@@ -115,7 +164,10 @@ describe.each(CHECKED_ELEMENTS.map((d) => [d.type, d] as const))('контрак
         for (const inputs of all) {
           const first = definition.evaluate({ inputs, props, state });
           const second = definition.evaluate({ inputs, props, state: first.state ?? state });
-          expect(second.outputs, `${inputs}`).toEqual(first.outputs);
+          // expect — только при расхождении: на 3ⁿ наборах сам вызов expect дороже вычисления.
+          if (second.outputs.some((v, i) => v !== first.outputs[i]) || second.outputs.length !== first.outputs.length) {
+            expect(second.outputs, `${inputs}`).toEqual(first.outputs);
+          }
         }
       }
     }

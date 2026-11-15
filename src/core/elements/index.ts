@@ -1,5 +1,8 @@
 import type { ElementDefinition } from '../types/element';
+import { DEMUX } from './combinational/demux';
+import { MUX } from './combinational/mux';
 import { AND } from './gates/and';
+import { BUFFER } from './gates/buffer';
 import { NAND } from './gates/nand';
 import { NOR } from './gates/nor';
 import { NOT } from './gates/not';
@@ -17,17 +20,29 @@ export const BUILTIN_ELEMENTS: readonly ElementDefinition[] = [
   AND,
   OR,
   NOT,
+  BUFFER,
   NAND,
   NOR,
   XOR,
   XNOR,
+  MUX,
+  DEMUX,
 ];
 
 export function createDefaultRegistry(): ElementRegistry {
   return new ElementRegistry(BUILTIN_ELEMENTS);
 }
 
-export { AND, INPUT, NAND, NOR, NOT, OR, OUTPUT, XNOR, XOR };
+export { AND, BUFFER, DEMUX, INPUT, MUX, NAND, NOR, NOT, OR, OUTPUT, XNOR, XOR };
+export {
+  channelCount,
+  channelMatch,
+  MAX_SELECT_BITS,
+  MIN_SELECT_BITS,
+  readAddress,
+  SELECT_BITS_SPEC,
+} from './combinational/select';
+export type { SelectAddress, SelectProps } from './combinational/select';
 export { ElementRegistry } from './registry';
 export { resolveProps } from './props';
 export { indexedPins, inputPinId, outputPinId } from './pins';

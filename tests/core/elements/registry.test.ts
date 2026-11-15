@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AND, BUILTIN_ELEMENTS, createDefaultRegistry, defineUnaryGate, ElementRegistry } from '@/core/elements';
 
 describe('ElementRegistry', () => {
-  it('реестр по умолчанию содержит 9 элементов первого этапа в порядке палитры', () => {
+  it('реестр по умолчанию содержит встроенные элементы в порядке палитры', () => {
     const registry = createDefaultRegistry();
     expect(registry.list().map((d) => d.type)).toEqual([
       'INPUT',
@@ -10,12 +10,15 @@ describe('ElementRegistry', () => {
       'AND',
       'OR',
       'NOT',
+      'BUFFER',
       'NAND',
       'NOR',
       'XOR',
       'XNOR',
+      'MUX',
+      'DEMUX',
     ]);
-    expect(BUILTIN_ELEMENTS).toHaveLength(9);
+    expect(BUILTIN_ELEMENTS).toHaveLength(12);
   });
 
   it('get / has / require', () => {
@@ -34,16 +37,16 @@ describe('ElementRegistry', () => {
   });
 
   it('позволяет зарегистрировать новый элемент без изменения ядра', () => {
-    const BUFFER = defineUnaryGate({ type: 'BUFFER', description: 'Повторитель', operation: (s) => s });
+    const REPEATER = defineUnaryGate({ type: 'TEST_REPEATER', description: 'Повторитель', operation: (s) => s });
     const registry = createDefaultRegistry();
-    registry.register(BUFFER);
-    expect(registry.require('BUFFER').evaluate({ inputs: [1], props: {}, state: undefined }).outputs).toEqual([1]);
+    registry.register(REPEATER);
+    expect(registry.require('TEST_REPEATER').evaluate({ inputs: [1], props: {}, state: undefined }).outputs).toEqual([1]);
   });
 
   it('экземпляры реестра независимы', () => {
     const a = createDefaultRegistry();
     const b = createDefaultRegistry();
-    a.register(defineUnaryGate({ type: 'BUFFER', description: '', operation: (s) => s }));
-    expect(b.has('BUFFER')).toBe(false);
+    a.register(defineUnaryGate({ type: 'TEST_REPEATER', description: '', operation: (s) => s }));
+    expect(b.has('TEST_REPEATER')).toBe(false);
   });
 });

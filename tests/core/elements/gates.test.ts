@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AND, MAX_GATE_INPUTS, MIN_GATE_INPUTS, NAND, NOR, NOT, OR, XNOR, XOR } from '@/core/elements';
+import { AND, BUFFER, MAX_GATE_INPUTS, MIN_GATE_INPUTS, NAND, NOR, NOT, OR, XNOR, XOR } from '@/core/elements';
 import type { KnownSignal, Signal } from '@/core/logic/signal';
 import type { ElementDefinition } from '@/core/types/element';
 import { knownCombinations } from '../../helpers/combinations';
@@ -79,5 +79,27 @@ describe('NOT', () => {
     expect(NOT.pins({})).toEqual({ inputs: [{ id: 'in0' }], outputs: [{ id: 'out0' }] });
     expect(NOT.defaultProps).toEqual({});
     expect(NOT.propSchema).toBeUndefined();
+  });
+});
+
+describe('BUFFER', () => {
+  const run = (input: Signal) => BUFFER.evaluate({ inputs: [input], props: {}, state: undefined }).outputs;
+
+  it('повторяет сигнал, X остаётся X', () => {
+    expect(run(0)).toEqual([0]);
+    expect(run(1)).toEqual([1]);
+    expect(run('X')).toEqual(['X']);
+  });
+
+  it('вентиль с одним входом и одним выходом без свойств', () => {
+    expect(BUFFER.pins({})).toEqual({ inputs: [{ id: 'in0' }], outputs: [{ id: 'out0' }] });
+    expect(BUFFER.defaultProps).toEqual({});
+    expect(BUFFER.propSchema).toBeUndefined();
+    expect(BUFFER.category).toBe('gates');
+    expect(BUFFER.label).toBe('BUFFER');
+  });
+
+  it('неподключённый вход читается как 0', () => {
+    expect(BUFFER.evaluate({ inputs: [], props: {}, state: undefined }).outputs).toEqual([0]);
   });
 });

@@ -66,6 +66,6 @@ describe('findPorts', () => {
   });
 
   it('неизвестные типы пропускаются', () => {
-    expect(findPorts(circuit(at('m', 'MUX', 0, 0)), registry)).toEqual({ inputs: [], outputs: [], duplicateLabels: [] });
+    expect(findPorts(circuit(at('m', 'UNKNOWN_ELEMENT', 0, 0)), registry)).toEqual({ inputs: [], outputs: [], duplicateLabels: [] });
   });
 });

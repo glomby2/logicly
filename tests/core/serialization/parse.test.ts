@@ -104,7 +104,7 @@ describe('parseCircuitFile: критические ошибки — файл о�
     ],
     ['повтор id элемента', variant((d) => (d.components[2]!.id = 'g')), { code: 'duplicate-component-id', detail: 'g' }],
     ['повтор id провода', variant((d) => (d.wires[1]!.id = 'w1')), { code: 'duplicate-wire-id', detail: 'w1' }],
-    ['неизвестный тип элемента', variant((d) => (d.components[1]!.type = 'MUX')), { code: 'unknown-type', detail: 'MUX' }],
+    ['неизвестный тип элемента', variant((d) => (d.components[1]!.type = 'UNKNOWN_ELEMENT')), { code: 'unknown-type', detail: 'UNKNOWN_ELEMENT' }],
   ];
 
   it.each(cases)('%s', (_, input, expected) => {
@@ -129,13 +129,13 @@ describe('parseCircuitFile: критические ошибки — файл о�
   it('все неизвестные типы перечисляются по одному разу', () => {
     const errors = errorsOf(
       variant((d) => {
-        d.components[0]!.type = 'MUX';
+        d.components[0]!.type = 'UNKNOWN_ELEMENT';
         d.components[1]!.type = 'CLOCK';
-        d.components[2]!.type = 'MUX';
+        d.components[2]!.type = 'UNKNOWN_ELEMENT';
       }),
     );
     expect(errors).toEqual([
-      { code: 'unknown-type', detail: 'MUX' },
+      { code: 'unknown-type', detail: 'UNKNOWN_ELEMENT' },
       { code: 'unknown-type', detail: 'CLOCK' },
     ]);
   });
@@ -213,5 +213,59 @@ describe('parseCircuitFile: исправимые ошибки — схема н�
       { code: 'props-normalized', count: 1 },
       { code: 'wires-removed', count: 1 },
     ]);
+  });
+
+  describe('MUX и DEMUX', () => {
+    const wire = (id: string, from: string, to: string) => {
+      const [fc = '', fp = ''] = from.split('.');
+      const [tc = '', tp = ''] = to.split('.');
+      return { id, from: { componentId: fc, pinId: fp }, to: { componentId: tc, pinId: tp } };
+    };
+    const document = (selectBits: unknown, wires: ReturnType<typeof wire>[]) => ({
+      ...validDocument(),
+      components: [
+        { id: 'a', type: 'INPUT', position: { x: 0, y: 0 }, props: { value: true } },
+        { id: 'm', type: 'MUX', position: { x: 100, y: 0 }, props: { selectBits } },
+        { id: 'x', type: 'DEMUX', position: { x: 200, y: 0 }, props: { selectBits } },
+      ],
+      wires,
+    });
+
+    it('корректная разрядность загружается без предупреждений', () => {
+      const result = ok(document(2, [wire('w1', 'a.out0', 'm.d3'), wire('w2', 'm.y', 'x.d'), wire('w3', 'a.out0', 'x.s1')]));
+      expect(result.warnings).toEqual([]);
+      expect(result.circuit.wires).toHaveLength(3);
+    });
+
+    it('разрядность вне диапазона ограничивается, провода к исчезнувшим пинам удаляются', () => {
+      const result = ok(
+        document(7, [
+          wire('w1', 'a.out0', 'm.d7'),
+          wire('w2', 'a.out0', 'm.d8'),
+          wire('w3', 'm.y', 'x.d'),
+          wire('w4', 'a.out0', 'x.s3'),
+        ]),
+      );
+      expect(result.circuit.components.slice(1).map((c) => c.props)).toEqual([{ selectBits: 3 }, { selectBits: 3 }]);
+      expect(result.circuit.wires.map((w) => w.id)).toEqual(['w1', 'w3']);
+      expect(result.warnings).toEqual([
+        { code: 'props-normalized', count: 2 },
+        { code: 'wires-removed', count: 2 },
+      ]);
+    });
+
+    it('провод на несуществующий вход D3 у MUX 2:1 и выход Y3 у DEMUX 1:2 удаляется', () => {
+      const result = ok(
+        document(1, [wire('w1', 'a.out0', 'm.d3'), wire('w2', 'x.y3', 'm.d0'), wire('w3', 'x.y1', 'm.d1'), wire('w4', 'a.out0', 'm.y')]),
+      );
+      expect(result.circuit.wires.map((w) => w.id)).toEqual(['w3']);
+      expect(result.warnings).toEqual([{ code: 'wires-removed', count: 3 }]);
+    });
+
+    it('selectBits неверного типа заменяется значением по умолчанию', () => {
+      const result = ok(document('4:1', []));
+      expect(result.circuit.components.slice(1).map((c) => c.props)).toEqual([{ selectBits: 1 }, { selectBits: 1 }]);
+      expect(result.warnings).toEqual([{ code: 'props-normalized', count: 2 }]);
+    });
   });
 });

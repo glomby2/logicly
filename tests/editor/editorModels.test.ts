@@ -165,7 +165,8 @@ describe('палитра', () => {
     const groups = groupElements(createDefaultRegistry().list());
     expect(groups.map((g) => [g.title, g.items.map((d) => d.type)])).toEqual([
       ['Ввод и вывод', ['INPUT', 'OUTPUT']],
-      ['Логические вентили', ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR']],
+      ['Логические вентили', ['AND', 'OR', 'NOT', 'BUFFER', 'NAND', 'NOR', 'XOR', 'XNOR']],
+      ['Комбинационные схемы', ['MUX', 'DEMUX']],
     ]);
   });
 });

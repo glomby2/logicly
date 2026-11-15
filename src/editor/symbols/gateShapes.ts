@@ -1,4 +1,5 @@
 import { PIN_PITCH, type NodeKind } from '../layout/geometry';
+import { MUX_SYMBOLS } from './muxShapes';
 
 /*
  * ANSI-символы вентилей (IEEE Std 91): форма корпуса и признак инверсии (кружок на выходе).
@@ -20,6 +21,7 @@ export const GATE_SYMBOLS: ReadonlyMap<string, GateSymbol> = new Map([
   ['XOR', { shape: 'xor', inverted: false }],
   ['XNOR', { shape: 'xor', inverted: true }],
   ['NOT', { shape: 'buffer', inverted: true }],
+  ['BUFFER', { shape: 'buffer', inverted: false }],
 ]);
 
 const IO_KINDS: ReadonlyMap<string, NodeKind> = new Map([
@@ -28,7 +30,9 @@ const IO_KINDS: ReadonlyMap<string, NodeKind> = new Map([
 ]);
 
 export function nodeKindOf(type: string): NodeKind {
-  return IO_KINDS.get(type) ?? (GATE_SYMBOLS.has(type) ? 'gate' : 'box');
+  if (IO_KINDS.has(type)) return IO_KINDS.get(type)!;
+  if (GATE_SYMBOLS.has(type)) return 'gate';
+  return MUX_SYMBOLS.has(type) ? 'mux' : 'box';
 }
 
 export interface BodyBox {

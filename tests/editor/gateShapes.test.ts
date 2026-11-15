@@ -26,6 +26,7 @@ describe('реестр символов', () => {
       XOR: { shape: 'xor', inverted: false },
       XNOR: { shape: 'xor', inverted: true },
       NOT: { shape: 'buffer', inverted: true },
+      BUFFER: { shape: 'buffer', inverted: false },
     });
   });
 
@@ -37,12 +38,15 @@ describe('реестр символов', () => {
       AND: 'gate',
       OR: 'gate',
       NOT: 'gate',
+      BUFFER: 'gate',
       NAND: 'gate',
       NOR: 'gate',
       XOR: 'gate',
       XNOR: 'gate',
+      MUX: 'mux',
+      DEMUX: 'mux',
     });
-    expect(nodeKindOf('MUX')).toBe('box');
+    expect(nodeKindOf('UNKNOWN_TYPE')).toBe('box');
     expect(nodeKindOf('toString')).toBe('box');
   });
 });

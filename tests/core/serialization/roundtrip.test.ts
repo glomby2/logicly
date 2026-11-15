@@ -20,17 +20,32 @@ function expectRoundTrip(circuit: Circuit, name = 'Схема') {
   expect(serializeCircuit(result.circuit, result.name)).toBe(text);
 }
 
-const GATES = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR', 'NOT'];
+const GATES = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR', 'NOT', 'BUFFER', 'MUX', 'DEMUX'];
 
-/** Случайная схема со всеми видами данных: позиции, подписи, число входов, положения INPUT, петли. */
+function randomProps(type: string, random: () => number): ElementProps {
+  switch (type) {
+    case 'INPUT':
+      return { value: random() < 0.5 };
+    case 'OUTPUT':
+    case 'NOT':
+    case 'BUFFER':
+      return {};
+    case 'MUX':
+    case 'DEMUX':
+      return { selectBits: 1 + Math.floor(random() * 3) };
+    default:
+      return { inputCount: 2 + Math.floor(random() * 7) };
+  }
+}
+
+/** Случайная схема со всеми видами данных: позиции, подписи, число входов и выходов, положения INPUT, петли. */
 function randomCircuit(random: () => number): Circuit {
   const pick = <T>(items: readonly T[]) => items[Math.floor(random() * items.length)]!;
   const components: CircuitComponent[] = [];
   const count = 1 + Math.floor(random() * 30);
   for (let i = 0; i < count; i++) {
     const type = random() < 0.2 ? 'INPUT' : random() < 0.1 ? 'OUTPUT' : pick(GATES);
-    const props: ElementProps =
-      type === 'INPUT' ? { value: random() < 0.5 } : type === 'OUTPUT' || type === 'NOT' ? {} : { inputCount: 2 + Math.floor(random() * 7) };
+    const props = randomProps(type, random);
     components.push({
       id: `${type.toLowerCase()}-${i}`,
       type,
@@ -44,10 +59,14 @@ function randomCircuit(random: () => number): Circuit {
   for (let k = 0; k < count * 2; k++) {
     const from = pick(components);
     const to = pick(components);
+    // Пины — из определения элемента (у MUX и DEMUX id по роли: d0, s0, y, y0…).
+    const outputs = registry.require(from.type).pins(from.props).outputs;
+    const inputs = registry.require(to.type).pins(to.props).inputs;
+    if (outputs.length === 0 || inputs.length === 0) continue;
     wires.push({
       id: `w-${k}`,
-      from: { componentId: from.id, pinId: 'out0' },
-      to: { componentId: to.id, pinId: `in${Math.floor(random() * 8)}` },
+      from: { componentId: from.id, pinId: pick(outputs).id },
+      to: { componentId: to.id, pinId: pick(inputs).id },
     });
   }
   // Недопустимые провода отбрасываются нормализацией: в схеме редактора их не бывает.
@@ -71,6 +90,24 @@ describe('сохранение → загрузка даёт ту же схем�
     );
     const labelled = { ...circuit, components: circuit.components.map((c) => ({ ...c, label: `${c.id}: "кавычки" \\` })) };
     expectRoundTrip(labelled, 'Имя с "кавычками" и /слешами/');
+  });
+
+  it('BUFFER, MUX и DEMUX всех разрядностей с проводами на пины по роли', () => {
+    const builder = new CircuitBuilder().input('A', true).input('S').gate('B', 'BUFFER').wire('A', 'B');
+    for (const bits of [1, 2, 3]) {
+      builder
+        .add(`M${bits}`, 'MUX', { selectBits: bits })
+        .add(`D${bits}`, 'DEMUX', { selectBits: bits })
+        .wire('B', `M${bits}.d${2 ** bits - 1}`)
+        .wire('S', `M${bits}.s${bits - 1}`)
+        .wire(`M${bits}.y`, `D${bits}.d`)
+        .wire('S', `D${bits}.s0`)
+        .output(`Y${bits}`)
+        .wire(`D${bits}.y${2 ** bits - 1}`, `Y${bits}`);
+    }
+    const circuit = normalized(builder.build(), registry);
+    expect(circuit.wires).toHaveLength(1 + 3 * 5);
+    expectRoundTrip(circuit, 'Мультиплексоры');
   });
 
   it('200 случайных схем', () => {

@@ -31,7 +31,7 @@ async function andCircuit(page: Page) {
 
 test.describe('рабочее поле', () => {
   test('палитра, сетка, мини-карта и кнопки масштаба', async ({ page }) => {
-    for (const type of ['INPUT', 'OUTPUT', 'AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR']) {
+    for (const type of ['INPUT', 'OUTPUT', 'AND', 'OR', 'NOT', 'BUFFER', 'NAND', 'NOR', 'XOR', 'XNOR']) {
       await expect(page.getByTestId(`palette-${type}`)).toBeVisible();
     }
     await expect(page.locator('.react-flow__background')).toBeVisible();
@@ -110,12 +110,12 @@ test.describe('элементы', () => {
   });
 
   test('все вентили отображаются ANSI-символами с правильным числом входов', async ({ page }) => {
-    const types = ['AND', 'OR', 'NOT', 'NAND', 'NOR', 'XOR', 'XNOR'];
+    const types = ['AND', 'OR', 'NOT', 'BUFFER', 'NAND', 'NOR', 'XOR', 'XNOR'];
     for (const [i, type] of types.entries()) {
       const id = await dropElement(page, type, { x: 120 + (i % 4) * 160, y: 140 + Math.floor(i / 4) * 160 });
       const node = page.getByTestId(`node-${id}`);
       await expect(node.locator('svg path').first()).toBeVisible();
-      const expectedInputs = type === 'NOT' ? 1 : 2;
+      const expectedInputs = type === 'NOT' || type === 'BUFFER' ? 1 : 2;
       await expect(node.locator('[data-testid*="-in"]')).toHaveCount(expectedInputs);
       // Инвертирующие вентили имеют кружок на выходе.
       await expect(node.locator('svg circle')).toHaveCount(['NOT', 'NAND', 'NOR', 'XNOR'].includes(type) ? 1 : 0);

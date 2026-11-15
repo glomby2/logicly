@@ -29,6 +29,7 @@ import { canConnect, connectionRejection } from './connectionRules';
 import { ContextMenu, type ContextMenuState } from './ContextMenu';
 import type { MenuCommand, MenuTarget } from './contextMenuModel';
 import { edgeTypes } from './edges/edgeTypes';
+import type { NodeKind } from './layout/geometry';
 import { useFitViewOnLoad } from './hooks/useFitViewOnLoad';
 import { useFlowElements } from './hooks/useFlowElements';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -39,7 +40,13 @@ import { DEFAULT_VIEWPORT, FIT_VIEW_OPTIONS } from './viewport';
 import { ZoomControls } from './ZoomControls';
 
 const MULTI_SELECT_KEYS = ['Shift', 'Control', 'Meta'];
-const MINIMAP_COLORS: Record<string, string> = { input: '#a7f3d0', output: '#fde68a', gate: '#cbd5e1', box: '#94a3b8' };
+const MINIMAP_COLORS: Record<NodeKind, string> = {
+  input: '#a7f3d0',
+  output: '#fde68a',
+  gate: '#cbd5e1',
+  mux: '#cbd5e1',
+  box: '#94a3b8',
+};
 
 const { circuit: circuitStore, ui: uiStore, commands } = appStores;
 
@@ -273,11 +280,11 @@ export function Canvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="#334155" />
         <ZoomControls />
-        <MiniMap
+        <MiniMap<ElementNode>
           pannable
           zoomable
           position="bottom-right"
-          nodeColor={(node) => MINIMAP_COLORS[node.type ?? 'box'] ?? SIGNAL_COLORS.low}
+          nodeColor={(node) => (node.type ? MINIMAP_COLORS[node.type] : SIGNAL_COLORS.low)}
           maskColor="rgba(2, 6, 23, 0.6)"
           className="!hidden sm:!block"
         />
