@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { AND, DEMUX, MUX, NOT, createDefaultRegistry, INPUT, OUTPUT } from '@/core/elements';
-import { computeGeometry, PIN_PITCH } from '@/editor/layout/geometry';
+import {
+  AND,
+  CLOCK,
+  createDefaultRegistry,
+  D_FLIP_FLOP,
+  D_LATCH,
+  DEMUX,
+  INPUT,
+  JK_FLIP_FLOP,
+  MUX,
+  NOT,
+  OUTPUT,
+  T_FLIP_FLOP,
+} from '@/core/elements';
+import { BOX_TITLE_ROWS, computeGeometry, PIN_PITCH } from '@/editor/layout/geometry';
 
 const registry = createDefaultRegistry();
 const gatePins = (inputCount: number) => AND.pins({ inputCount });
@@ -83,8 +96,34 @@ describe('computeGeometry: MUX и DEMUX', () => {
   });
 });
 
+describe('computeGeometry: CLOCK и триггеры', () => {
+  it('CLOCK — как INPUT: выход справа по центру', () => {
+    const clock = computeGeometry('clock', CLOCK.pins(CLOCK.defaultProps));
+    const input = computeGeometry('input', INPUT.pins(INPUT.defaultProps));
+    expect(clock).toMatchObject({ kind: 'clock', width: input.width, height: input.height });
+    expect(clock.pins).toEqual([{ id: 'out0', direction: 'output', side: 'right', x: clock.width, y: clock.height / 2 }]);
+  });
+
+  it.each([
+    [D_FLIP_FLOP, ['d', 'clk'], 80],
+    [T_FLIP_FLOP, ['t', 'clk'], 80],
+    [JK_FLIP_FLOP, ['j', 'clk', 'k'], 100],
+    [D_LATCH, ['d', 'e'], 80],
+  ])('%#: под полосой названия входы слева на шаге сетки, Q и Q̄ справа; значок ▷ только у CLK', (definition, inputs, height) => {
+    const geometry = computeGeometry('box', definition.pins({}));
+    expect(geometry.height).toBe(height);
+    const left = geometry.pins.filter((p) => p.side === 'left');
+    expect(left.map((p) => [p.id, p.y])).toEqual(inputs.map((id, i) => [id, (i + 1 + BOX_TITLE_ROWS) * PIN_PITCH]));
+    expect(left.filter((p) => p.clock).map((p) => p.id)).toEqual(inputs.filter((id) => id === 'clk'));
+    expect(geometry.pins.filter((p) => p.side === 'right').map((p) => [p.id, p.label])).toEqual([
+      ['q', 'Q'],
+      ['qn', 'Q̄'],
+    ]);
+  });
+});
+
 describe('computeGeometry: универсальный прямоугольник', () => {
-  it('учитывает стороны и подписи пинов (на примере MUX-подобного элемента)', () => {
+  it('учитывает стороны и подписи пинов; боковые пины — под полосой названия', () => {
     const geometry = computeGeometry('box', {
       inputs: [
         { id: 'd0', label: 'D0' },
@@ -94,10 +133,12 @@ describe('computeGeometry: универсальный прямоугольник
       outputs: [{ id: 'y', label: 'Y' }],
     });
     const byId = Object.fromEntries(geometry.pins.map((p) => [p.id, p]));
-    expect(byId.d0).toMatchObject({ side: 'left', x: 0, y: PIN_PITCH, label: 'D0' });
-    expect(byId.d1).toMatchObject({ side: 'left', x: 0, y: 2 * PIN_PITCH });
+    expect(BOX_TITLE_ROWS).toBe(1);
+    expect(byId.d0).toMatchObject({ side: 'left', x: 0, y: 2 * PIN_PITCH, label: 'D0' });
+    expect(byId.d1).toMatchObject({ side: 'left', x: 0, y: 3 * PIN_PITCH });
     expect(byId.s0).toMatchObject({ side: 'bottom', x: PIN_PITCH, y: geometry.height });
-    expect(byId.y).toMatchObject({ side: 'right', x: geometry.width, y: PIN_PITCH });
+    expect(byId.y).toMatchObject({ side: 'right', x: geometry.width, y: 2 * PIN_PITCH });
+    expect(geometry.height).toBe(4 * PIN_PITCH);
   });
 
   it('элемент без пинов имеет минимальный размер', () => {

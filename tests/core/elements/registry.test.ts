@@ -7,6 +7,7 @@ describe('ElementRegistry', () => {
     expect(registry.list().map((d) => d.type)).toEqual([
       'INPUT',
       'OUTPUT',
+      'CLOCK',
       'AND',
       'OR',
       'NOT',
@@ -17,8 +18,12 @@ describe('ElementRegistry', () => {
       'XNOR',
       'MUX',
       'DEMUX',
+      'D_LATCH',
+      'D_FLIP_FLOP',
+      'T_FLIP_FLOP',
+      'JK_FLIP_FLOP',
     ]);
-    expect(BUILTIN_ELEMENTS).toHaveLength(12);
+    expect(BUILTIN_ELEMENTS).toHaveLength(17);
   });
 
   it('get / has / require', () => {

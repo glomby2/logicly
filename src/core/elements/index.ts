@@ -9,6 +9,11 @@ import { NOT } from './gates/not';
 import { OR } from './gates/or';
 import { XNOR } from './gates/xnor';
 import { XOR } from './gates/xor';
+import { D_FLIP_FLOP } from './sequential/dFlipFlop';
+import { D_LATCH } from './sequential/dLatch';
+import { JK_FLIP_FLOP } from './sequential/jkFlipFlop';
+import { T_FLIP_FLOP } from './sequential/tFlipFlop';
+import { CLOCK } from './io/clock';
 import { INPUT } from './io/input';
 import { OUTPUT } from './io/output';
 import { ElementRegistry } from './registry';
@@ -17,6 +22,7 @@ import { ElementRegistry } from './registry';
 export const BUILTIN_ELEMENTS: readonly ElementDefinition[] = [
   INPUT,
   OUTPUT,
+  CLOCK,
   AND,
   OR,
   NOT,
@@ -27,13 +33,19 @@ export const BUILTIN_ELEMENTS: readonly ElementDefinition[] = [
   XNOR,
   MUX,
   DEMUX,
+  D_LATCH,
+  D_FLIP_FLOP,
+  T_FLIP_FLOP,
+  JK_FLIP_FLOP,
 ];
 
 export function createDefaultRegistry(): ElementRegistry {
   return new ElementRegistry(BUILTIN_ELEMENTS);
 }
 
-export { AND, BUFFER, DEMUX, INPUT, MUX, NAND, NOR, NOT, OR, OUTPUT, XNOR, XOR };
+export { AND, BUFFER, CLOCK, DEMUX, INPUT, MUX, NAND, NOR, NOT, OR, OUTPUT, XNOR, XOR };
+export { MAX_HALF_PERIOD, MIN_HALF_PERIOD } from './io/clock';
+export type { ClockProps, ClockState } from './io/clock';
 export {
   channelCount,
   channelMatch,
@@ -43,6 +55,13 @@ export {
   SELECT_BITS_SPEC,
 } from './combinational/select';
 export type { SelectAddress, SelectProps } from './combinational/select';
+export { D_FLIP_FLOP, D_LATCH, JK_FLIP_FLOP, T_FLIP_FLOP };
+export { jkNext } from './sequential/jkFlipFlop';
+export type { LatchState } from './sequential/dLatch';
+export { clockEdge, clockedValue, rememberClock } from './sequential/edge';
+export type { ClockEdge, ClockMemory } from './sequential/edge';
+export { CLOCK_PIN, defineFlipFlop, LATCH_OUTPUTS } from './sequential/flipFlop';
+export type { FlipFlopState } from './sequential/flipFlop';
 export { ElementRegistry } from './registry';
 export { resolveProps } from './props';
 export { indexedPins, inputPinId, outputPinId } from './pins';

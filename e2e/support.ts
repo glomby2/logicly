@@ -105,7 +105,9 @@ const defaultProps = (type: string): Record<string, number | boolean> =>
       ? { inputCount: 2 }
       : SELECTORS.includes(type)
         ? { selectBits: 1 }
-        : {};
+        : type === 'CLOCK'
+          ? { halfPeriod: 1 }
+          : {};
 
 /** Документ `.lsim`: элементы и провода `'A' → 'G.in1'` (выход по умолчанию `out0`, вход — `in0`). */
 export function circuitFile(name: string, components: readonly FileComponentSpec[], wires: readonly [string, string][]) {

@@ -80,20 +80,50 @@ describe('проверка монотонности', () => {
   });
 });
 
-/** Начальное состояние и состояния после одного вычисления и одного тика из него. */
+/** Предел числа состояний: у элементов реестра их единицы или десятки (CLOCK — до 32). */
+const MAX_REACHABLE_STATES = 1000;
+
+/**
+ * Все состояния, достижимые из начального и из `unknownState` любыми последовательностями
+ * вычислений (на всех троичных наборах входов) и тиков. Триггеру нужно не меньше двух
+ * вычислений, чтобы получить Q = 1 (запомнить CLK = 0, затем фронт), поэтому строится
+ * полное замыкание, а не один шаг.
+ */
 function reachableStates(definition: ElementDefinition, props: ElementProps): unknown[] {
-  const initial = definition.initialState?.(props);
-  if (initial === undefined) return [undefined];
-  const states: unknown[] = [initial];
-  for (const inputs of ternaryCombinations(definition.pins(props).inputs.length)) {
-    const next = definition.evaluate({ inputs, props, state: initial }).state;
-    if (next !== undefined) states.push(next);
+  const roots = [definition.initialState?.(props), definition.unknownState?.(props)].filter((s) => s !== undefined);
+  if (roots.length === 0) return [undefined];
+  const inputSets = ternaryCombinations(definition.pins(props).inputs.length);
+  const seen = new Map<string, unknown>();
+  const queue: unknown[] = [...roots];
+  while (queue.length > 0) {
+    const state = queue.pop();
+    const key = JSON.stringify(state);
+    if (seen.has(key)) continue;
+    seen.set(key, state);
+    if (seen.size > MAX_REACHABLE_STATES) throw new Error(`${definition.type}: слишком много состояний`);
+    for (const inputs of inputSets) {
+      const next = definition.evaluate({ inputs, props, state }).state;
+      if (next !== undefined) queue.push(next);
+    }
+    if (definition.onTick) queue.push(definition.onTick({ props, state, time: 1 }));
   }
-  if (definition.onTick) states.push(definition.onTick({ props, state: initial, time: 1 }));
-  return states;
+  return [...seen.values()];
 }
 
-// Тестовые элементы с состоянием проверяются тем же контрактом, что и будущие CLOCK и триггеры.
+describe('достижимые состояния', () => {
+  it('у триггеров и защёлки замыкание содержит Q = 0, 1 и X; у CLOCK — оба уровня', () => {
+    for (const type of ['D_LATCH', 'D_FLIP_FLOP', 'T_FLIP_FLOP', 'JK_FLIP_FLOP']) {
+      const definition = BUILTIN_ELEMENTS.find((d) => d.type === type)!;
+      const qs = new Set(reachableStates(definition, {}).map((s) => (s as { q: unknown }).q));
+      expect([...qs].sort(), type).toEqual([0, 1, 'X'].sort());
+    }
+    const clock = BUILTIN_ELEMENTS.find((d) => d.type === 'CLOCK')!;
+    const levels = new Set(reachableStates(clock, { halfPeriod: 3 }).map((s) => (s as { level: unknown }).level));
+    expect([...levels].sort()).toEqual([0, 1]);
+  });
+});
+
+// Тестовые элементы с состоянием проверяются тем же контрактом, что и встроенные CLOCK и триггеры.
 const CHECKED_ELEMENTS: readonly ElementDefinition[] = [...BUILTIN_ELEMENTS, TEST_CLOCK, TEST_DFF];
 
 describe.each(CHECKED_ELEMENTS.map((d) => [d.type, d] as const))('контракт элемента %s', (_, definition) => {
@@ -134,6 +164,23 @@ describe.each(CHECKED_ELEMENTS.map((d) => [d.type, d] as const))('контрак
           if (again.some((v, i) => v !== result[i])) expect(again, `${values}`).toEqual(result);
         }
         expect(monotonicityViolation(run, inputs.length), JSON.stringify(props)).toBeNull();
+      }
+    }
+  });
+
+  it('unknownState не определённее любого достижимого состояния', () => {
+    if (!definition.unknownState) return;
+    expect(definition.initialState, 'unknownState имеет смысл только у элемента с состоянием').toBeDefined();
+    for (const props of propVariants(definition)) {
+      const unknown = definition.unknownState(props);
+      const states = reachableStates(definition, props);
+      for (const inputs of ternaryCombinations(definition.pins(props).inputs.length)) {
+        const vague = definition.evaluate({ inputs, props, state: unknown }).outputs;
+        for (const state of states) {
+          const exact = definition.evaluate({ inputs, props, state }).outputs;
+          const violation = refinementViolation(vague, exact, `входы ${inputs}, состояние ${JSON.stringify(state)}`);
+          if (violation) expect.fail(violation);
+        }
       }
     }
   });

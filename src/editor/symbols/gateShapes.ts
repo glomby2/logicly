@@ -27,6 +27,7 @@ export const GATE_SYMBOLS: ReadonlyMap<string, GateSymbol> = new Map([
 const IO_KINDS: ReadonlyMap<string, NodeKind> = new Map([
   ['INPUT', 'input'],
   ['OUTPUT', 'output'],
+  ['CLOCK', 'clock'],
 ]);
 
 export function nodeKindOf(type: string): NodeKind {

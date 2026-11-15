@@ -44,9 +44,20 @@ const refine: OutputUpdate = (current, computed) => (current === UNKNOWN ? compu
 /**
  * Событийный движок симуляции без задержек.
  *
- * `settle()` выполняет релаксацию: элементы берутся из очереди по рангу и сразу
- * обновляют свои выходы; изменение сети ставит в очередь её читателей. Устойчивые
- * петли (защёлки) сходятся к неподвижной точке.
+ * `settle()` выполняет релаксацию: элементы берутся из очереди по рангу;
+ * изменение сети ставит в очередь её читателей. Устойчивые петли (защёлки
+ * на вентилях) сходятся к неподвижной точке.
+ *
+ * **Дельта-циклы.** Комбинационные элементы (без `initialState`) обновляют выходы сразу.
+ * Элементы с состоянием (триггеры, защёлки, генераторы) обновляют состояние сразу,
+ * а выходы публикуют на границе дельта-цикла — когда очередь опустела. Поэтому все
+ * триггеры, сработавшие от одного фронта, захватывают данные из состояния до фронта,
+ * а результат не зависит от порядка их вычисления.
+ *
+ * **Включение.** Сети равны 0, состояния — `initialState`, а выходы элементов с состоянием
+ * сразу равны вычисленным из начального состояния (Q̄ = 1 до первого расчёта): иначе
+ * переход 0 → 1 при включении выглядел бы как фронт. То же для элемента, добавленного
+ * при перекомпиляции (его состояния нет в переносимом снимке).
  *
  * Элемент, вычисленный за один расчёт больше `oscillationThreshold` раз, признаётся
  * колеблющимся: его выходы до конца расчёта обновляются через `join` (могут только
@@ -55,9 +66,11 @@ const refine: OutputUpdate = (current, computed) => (current === UNKNOWN ? compu
  * вычисления у независимых защёлок. Затем фаза уточнения заменяет X вычисленными
  * значениями там, где они однозначны.
  *
- * Расчёт конечен при любых `evaluate`: непомеченный элемент меняет выходы не более
- * `oscillationThreshold` раз, помеченный — не более одного раза (в X), а при уточнении
- * каждая сеть меняется не более одного раза (из X).
+ * Расчёт конечен при любых `evaluate`: непомеченный элемент вычисляется не более
+ * `oscillationThreshold` раз (отложенные выходы публикуются только после вычисления,
+ * поэтому каждая публикация тоже ограничена порогом), помеченный меняет выходы не более
+ * одного раза (в X, сразу, без откладывания), а при уточнении каждая сеть меняется не более
+ * одного раза (из X).
  *
  * Мутирующие методы (`reset`, `setProps`) только планируют пересчёт — его выполняет `settle()`.
  */
@@ -71,6 +84,10 @@ export class SimulationEngine {
   private readonly evaluationCounts: Uint32Array;
   private readonly oscillating: Uint8Array;
   private readonly tickers: readonly number[];
+  /** Элементы с состоянием: выходы публикуются на границе дельта-цикла. */
+  private readonly deferred: Uint8Array;
+  /** Отложенные выходы текущего дельта-цикла. */
+  private readonly pending = new Map<number, readonly Signal[]>();
   private currentTime = 0;
 
   constructor(netlist: Netlist, options: EngineOptions = {}) {
@@ -84,8 +101,10 @@ export class SimulationEngine {
     this.evaluationCounts = new Uint32Array(components.length);
     this.oscillating = new Uint8Array(components.length);
     this.tickers = components.filter((c) => c.definition.onTick).map((c) => c.index);
+    this.deferred = Uint8Array.from(components, (c) => (c.definition.initialState ? 1 : 0));
 
-    if (options.initialState) this.restore(options.initialState);
+    const restored = options.initialState ? this.restore(options.initialState) : new Set<number>();
+    this.presetStatefulOutputs(restored);
     this.scheduleAll();
   }
 
@@ -93,12 +112,17 @@ export class SimulationEngine {
     return this.currentTime;
   }
 
-  /** Состояние при включении: все сети 0, начальные состояния элементов, время 0. */
+  /**
+   * Состояние при включении: сети 0, начальные состояния элементов, выходы элементов
+   * с состоянием — из начального состояния, время 0.
+   */
   reset(): void {
     this.values.fill(0);
     this.netlist.components.forEach((c, i) => (this.states[i] = c.definition.initialState?.(this.props[i]!)));
     this.currentTime = 0;
     this.queue.clear();
+    this.pending.clear();
+    this.presetStatefulOutputs(new Set());
     this.scheduleAll();
   }
 
@@ -128,20 +152,26 @@ export class SimulationEngine {
     let evaluations = 0;
     let oscillation = false;
 
-    while (this.queue.size > 0) {
-      const index = this.queue.pop();
-      evaluations++;
-      if (!this.oscillating[index] && ++this.evaluationCounts[index]! > this.threshold) {
-        this.oscillating[index] = 1;
-        oscillation = true;
+    while (this.queue.size > 0 || this.pending.size > 0) {
+      while (this.queue.size > 0) {
+        const index = this.queue.pop();
+        evaluations++;
+        if (!this.oscillating[index] && ++this.evaluationCounts[index]! > this.threshold) {
+          this.oscillating[index] = 1;
+          oscillation = true;
+        }
+        const result = this.evaluate(index);
+        if (this.oscillating[index]) {
+          // Колеблющийся элемент гасится сразу: выход может только перейти в X.
+          this.pending.delete(index);
+          this.applyOutputs(index, result.outputs, join);
+        } else {
+          if (result.state !== undefined) this.states[index] = result.state;
+          if (this.deferred[index]) this.pending.set(index, result.outputs);
+          else this.applyOutputs(index, result.outputs, assign);
+        }
       }
-      const result = this.evaluate(index);
-      if (this.oscillating[index]) {
-        this.applyOutputs(index, result.outputs, join);
-      } else {
-        if (result.state !== undefined) this.states[index] = result.state;
-        this.applyOutputs(index, result.outputs, assign);
-      }
+      this.publishPending();
     }
 
     if (oscillation) evaluations += this.refineUnknown();
@@ -217,15 +247,40 @@ export class SimulationEngine {
     return { time: this.currentTime, nets: this.getSignals(), componentStates };
   }
 
-  private restore(state: EngineState): void {
+  /** Переносит снимок. Возвращает индексы элементов, чьё состояние было в снимке. */
+  private restore(state: EngineState): Set<number> {
+    const restored = new Set<number>();
     this.netlist.netIds.forEach((id, i) => {
       const value = state.nets[id];
       if (value !== undefined) this.values[i] = value;
     });
     this.netlist.components.forEach((c, i) => {
-      if (c.id in state.componentStates) this.states[i] = state.componentStates[c.id];
+      if (!(c.id in state.componentStates)) return;
+      this.states[i] = state.componentStates[c.id];
+      restored.add(i);
     });
     this.currentTime = state.time;
+    return restored;
+  }
+
+  /**
+   * Выходы элементов с состоянием, кроме перенесённых из снимка, сразу получают значения,
+   * вычисленные из текущего (начального) состояния. Новое состояние из этого вычисления
+   * не сохраняется — его учтёт первый расчёт.
+   */
+  private presetStatefulOutputs(skip: ReadonlySet<number>): void {
+    this.netlist.components.forEach((component, index) => {
+      if (!this.deferred[index] || skip.has(index)) return;
+      this.evaluate(index).outputs.forEach((value, i) => (this.values[component.outputNets[i]!] = value));
+    });
+  }
+
+  /** Граница дельта-цикла: публикует отложенные выходы элементов с состоянием. */
+  private publishPending(): void {
+    if (this.pending.size === 0) return;
+    const batch = [...this.pending];
+    this.pending.clear();
+    for (const [index, outputs] of batch) this.applyOutputs(index, outputs, assign);
   }
 
   private scheduleAll(): void {

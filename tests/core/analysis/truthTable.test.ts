@@ -229,6 +229,54 @@ describe('MUX и DEMUX', () => {
   });
 });
 
+describe('триггеры и защёлки (unknownState)', () => {
+  it.each(['D_FLIP_FLOP', 'T_FLIP_FLOP'])('%s: Q зависит от прошлого во всех строках — «↺», после сброса 0', (type) => {
+    const data = type === 'D_FLIP_FLOP' ? 'd' : 't';
+    const b = new CircuitBuilder().input('A').input('C').add('F', type).wire('A', `F.${data}`).wire('C', 'F.clk');
+    const t = table(observe(b.output('Q').wire('F.q', 'Q')));
+    expect(rows(t)).toEqual(['00|↺0', '01|↺0', '10|↺0', '11|↺0']);
+    expect(t.warnings).toEqual([{ code: 'memory', count: 4 }]);
+  });
+
+  it('JK FLIP-FLOP: 8 строк «↺»', () => {
+    const b = new CircuitBuilder().input('J').input('K').input('C').add('F', 'JK_FLIP_FLOP');
+    b.wire('J', 'F.j').wire('K', 'F.k').wire('C', 'F.clk').output('Q').wire('F.q', 'Q');
+    const t = table(observe(b));
+    expect(t.rows.map((r) => cellText(r.outputs[0]!))).toEqual(Array(8).fill('↺0'));
+    expect(codes(t)).toEqual(['memory']);
+  });
+
+  it('D LATCH: E = 1 — Q = D, E = 0 — «↺»', () => {
+    const b = new CircuitBuilder().input('D').input('E').add('L', 'D_LATCH').wire('D', 'L.d').wire('E', 'L.e');
+    const t = table(observe(b.output('Q').output('QN').wire('L.q', 'Q').wire('L.qn', 'QN')));
+    expect(rows(t)).toEqual(['00|↺0 ↺1', '01|0 1', '10|↺0 ↺1', '11|1 0']);
+    expect(t.warnings).toEqual([{ code: 'memory', count: 4 }]);
+  });
+
+  it('комбинационная часть после триггера определена, где не зависит от Q', () => {
+    // Y = A · Q: при A = 0 выход 0 при любом Q, при A = 1 — «↺».
+    const b = new CircuitBuilder().input('A').input('C').input('D').add('F', 'D_FLIP_FLOP').gate('G', 'AND');
+    b.wire('D', 'F.d').wire('C', 'F.clk').wire('A', 'G.in0').wire('F.q', 'G.in1').output('Y').wire('G', 'Y');
+    const t = table(observe(b));
+    expect(t.rows.map((r) => `${r.inputs[0]}:${cellText(r.outputs[0]!)}`)).toEqual([
+      '0:0', '0:0', '0:0', '0:0', '1:↺0', '1:↺0', '1:↺0', '1:↺0',
+    ]);
+  });
+
+  it('CLOCK: таблица при t = 0, триггер от генератора — «↺»', () => {
+    const b = new CircuitBuilder().input('D').add('K', 'CLOCK').add('F', 'D_FLIP_FLOP').wire('D', 'F.d').wire('K', 'F.clk');
+    const t = table(observe(b.output('Q').wire('F.q', 'Q')));
+    expect(rows(t)).toEqual(['0|↺0', '1|↺0']);
+    expect(codes(t)).toEqual(['memory', 'time-elements']);
+  });
+
+  it('построение не меняет схему и даёт тот же результат повторно', () => {
+    const b = new CircuitBuilder().input('D').input('C').add('F', 'D_FLIP_FLOP').wire('D', 'F.d').wire('C', 'F.clk');
+    const circuit = deepFreeze(observe(b.output('Q').wire('F.q', 'Q')));
+    expect(buildTruthTable(circuit, registry)).toEqual(buildTruthTable(circuit, registry));
+  });
+});
+
 describe('неопределённые значения X', () => {
   it('NOT на себя — X, строка нестабильна', () => {
     const t = table(observe(new CircuitBuilder().gate('N', 'NOT').wire('N', 'N'), 'N'));

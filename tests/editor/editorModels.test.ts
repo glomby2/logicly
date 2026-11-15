@@ -164,9 +164,10 @@ describe('палитра', () => {
   it('группирует элементы по категориям в порядке реестра', () => {
     const groups = groupElements(createDefaultRegistry().list());
     expect(groups.map((g) => [g.title, g.items.map((d) => d.type)])).toEqual([
-      ['Ввод и вывод', ['INPUT', 'OUTPUT']],
+      ['Ввод и вывод', ['INPUT', 'OUTPUT', 'CLOCK']],
       ['Логические вентили', ['AND', 'OR', 'NOT', 'BUFFER', 'NAND', 'NOR', 'XOR', 'XNOR']],
       ['Комбинационные схемы', ['MUX', 'DEMUX']],
+      ['Триггеры и память', ['D_LATCH', 'D_FLIP_FLOP', 'T_FLIP_FLOP', 'JK_FLIP_FLOP']],
     ]);
   });
 });

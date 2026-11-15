@@ -1,6 +1,7 @@
 import type { NodeTypes } from '@xyflow/react';
 import type { NodeKind } from '../layout/geometry';
 import { BoxNode } from './BoxNode';
+import { ClockNode } from './ClockNode';
 import { GateNode } from './GateNode';
 import { InputNode } from './InputNode';
 import { MuxNode } from './MuxNode';
@@ -10,6 +11,7 @@ export const nodeTypes = {
   gate: GateNode,
   input: InputNode,
   output: OutputNode,
+  clock: ClockNode,
   mux: MuxNode,
   box: BoxNode,
 } satisfies Record<NodeKind, NodeTypes[string]>;

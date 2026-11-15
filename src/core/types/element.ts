@@ -11,6 +11,8 @@ export interface PinSpec {
   /** Подпись пина на символе (`D`, `CLK`, `Q`). Для вентилей не нужна. */
   readonly label?: string;
   readonly side?: PinSide;
+  /** Тактовый (динамический) вход: на символе отмечается значком ▷. */
+  readonly clock?: boolean;
 }
 
 export interface ElementPins {
@@ -95,6 +97,13 @@ export interface ElementDefinition<P extends ElementProps = ElementProps, S = un
   readonly port?: ElementPort;
   pins(props: P): ElementPins;
   initialState?(props: P): S;
+  /**
+   * Состояние с неизвестным содержимым памяти (Q = X) — для анализа: таблица истинности
+   * считает от него, и выход, зависящий от прошлого, получает «↺». Выходы из этого
+   * состояния не определённее выходов из любого достижимого состояния (проверяет
+   * контрактный тест). Без него элемент анализируется от `initialState`.
+   */
+  unknownState?(props: P): S;
   evaluate(context: EvalContext<P, S>): EvalResult<S>;
   /** Реакция на шаг времени (CLOCK). Возвращает новое состояние. */
   onTick?(context: TickContext<P, S>): S;

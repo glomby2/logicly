@@ -77,8 +77,9 @@ export function rowBits(row: number, count: number): (0 | 1)[] {
  * Схема компилируется один раз; каждая строка считается в отдельном экземпляре
  * `SimulationEngine`, поэтому основная симуляция, хранилища и схема не затрагиваются.
  *
- * Основной расчёт строки идёт от состояния «все сети X» (содержимое памяти неизвестно):
- * комбинационная часть и однозначно установленные петли получают 0 или 1, а значения,
+ * Основной расчёт строки идёт от состояния «все сети X» (содержимое памяти неизвестно,
+ * триггеры и защёлки — в `unknownState`): комбинационная часть, однозначно
+ * установленные петли и прозрачные защёлки получают 0 или 1, а значения,
  * зависящие от предыдущего состояния, остаются X. Если у выхода X, выполняется второй
  * расчёт от состояния включения: X и там — значение неопределённо (`unknown`),
  * иначе выход хранит предыдущее значение (`memory`).
@@ -104,10 +105,14 @@ export function buildTruthTable(
     return { ...port, floating: pin === undefined || floating.has(netIdOf(pin)) };
   });
 
+  // Содержимое памяти неизвестно: сети X, элементы с `unknownState` — в нём (Q = X).
+  // Элементы без него считаются от начального состояния (предупреждение `stateful-elements`).
   const unknownStart: EngineState = {
     time: 0,
     nets: Object.fromEntries(netlist.netIds.map((id) => [id, UNKNOWN])),
-    componentStates: {},
+    componentStates: Object.fromEntries(
+      netlist.components.flatMap((c) => (c.definition.unknownState ? [[c.id, c.definition.unknownState(c.props)]] : [])),
+    ),
   };
 
   const run = (bits: readonly (0 | 1)[], initialState?: EngineState) => {
@@ -167,8 +172,9 @@ function collectWarnings(
   push('memory', count('memory'));
   push('unknown', count('unknown'));
   const definitions = netlist.components.map((c) => c.definition);
-  // Элементы времени сообщаются отдельно, даже если у них тоже есть состояние.
-  push('stateful-elements', definitions.filter((d) => d.initialState && !d.onTick).length);
+  // Элементы времени сообщаются отдельно, даже если у них тоже есть состояние. Элементы
+  // с `unknownState` считаются от неизвестного состояния — их память даёт «↺» (`memory`).
+  push('stateful-elements', definitions.filter((d) => d.initialState && !d.unknownState && !d.onTick).length);
   push('time-elements', definitions.filter((d) => d.onTick).length);
   push('floating-inputs', findFloatingInputs(netlist).length);
   if (duplicateLabels.length > 0) warnings.push({ code: 'duplicate-labels', labels: duplicateLabels });

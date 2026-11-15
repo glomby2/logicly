@@ -35,6 +35,7 @@ describe('реестр символов', () => {
     expect(kinds).toEqual({
       INPUT: 'input',
       OUTPUT: 'output',
+      CLOCK: 'clock',
       AND: 'gate',
       OR: 'gate',
       NOT: 'gate',
@@ -45,6 +46,10 @@ describe('реестр символов', () => {
       XNOR: 'gate',
       MUX: 'mux',
       DEMUX: 'mux',
+      D_LATCH: 'box',
+      D_FLIP_FLOP: 'box',
+      T_FLIP_FLOP: 'box',
+      JK_FLIP_FLOP: 'box',
     });
     expect(nodeKindOf('UNKNOWN_TYPE')).toBe('box');
     expect(nodeKindOf('toString')).toBe('box');

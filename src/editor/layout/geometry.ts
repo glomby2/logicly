@@ -6,10 +6,10 @@ export const PIN_PITCH = 20;
 export const HANDLE_SIZE = 12;
 
 /**
- * Вид узла на поле: вентиль с ANSI-символом, переключатель, индикатор, трапеция MUX / DEMUX
- * или универсальный прямоугольник.
+ * Вид узла на поле: вентиль с ANSI-символом, переключатель, индикатор, генератор тактов,
+ * трапеция MUX / DEMUX или универсальный прямоугольник.
  */
-export type NodeKind = 'gate' | 'input' | 'output' | 'mux' | 'box';
+export type NodeKind = 'gate' | 'input' | 'output' | 'clock' | 'mux' | 'box';
 
 export interface PinGeometry {
   readonly id: string;
@@ -19,6 +19,8 @@ export interface PinGeometry {
   readonly x: number;
   readonly y: number;
   readonly label?: string;
+  /** Тактовый вход (из `PinSpec.clock`): символ рисует значок ▷. */
+  readonly clock?: boolean;
 }
 
 export interface ElementGeometry {
@@ -75,8 +77,9 @@ function gateGeometry(pins: ElementPins): ElementGeometry {
   return { kind: 'gate', width: GATE_WIDTH, height, pins: [...inputs, ...outputs] };
 }
 
-function ioGeometry(kind: 'input' | 'output', pins: ElementPins): ElementGeometry {
-  const width = kind === 'input' ? INPUT_WIDTH : OUTPUT_WIDTH;
+/** INPUT, CLOCK (выход справа) и OUTPUT (вход слева): пин по центру стороны. */
+function ioGeometry(kind: 'input' | 'output' | 'clock', pins: ElementPins): ElementGeometry {
+  const width = kind === 'output' ? OUTPUT_WIDTH : INPUT_WIDTH;
   const center = IO_HEIGHT / 2;
   return {
     kind,
@@ -91,14 +94,24 @@ function ioGeometry(kind: 'input' | 'output', pins: ElementPins): ElementGeometr
   };
 }
 
-/** Универсальный прямоугольник: пины на сторонах из `PinSpec.side` (входы слева, выходы справа по умолчанию). */
+/**
+ * Шагов сетки над пинами боковых сторон прямоугольника: полоса под название
+ * («JK FLIP-FLOP» шире промежутка между подписями пинов, поэтому не помещается между ними).
+ */
+export const BOX_TITLE_ROWS = 1;
+
+/**
+ * Универсальный прямоугольник: пины на сторонах из `PinSpec.side` (входы слева, выходы справа
+ * по умолчанию). Сверху — полоса названия, пины боковых сторон начинаются под ней.
+ */
 function boxGeometry(pins: ElementPins): ElementGeometry {
   const all = [
     ...pins.inputs.map((spec) => ({ spec, direction: 'input' as const, side: spec.side ?? 'left' })),
     ...pins.outputs.map((spec) => ({ spec, direction: 'output' as const, side: spec.side ?? 'right' })),
   ];
   const onSide = (side: PinSide) => all.filter((p) => p.side === side);
-  const height = (Math.max(onSide('left').length, onSide('right').length, 2) + 1) * PIN_PITCH;
+  const rows = Math.max(onSide('left').length, onSide('right').length, 1);
+  const height = (rows + 1 + BOX_TITLE_ROWS) * PIN_PITCH;
   const width = Math.max(BOX_WIDTH, (Math.max(onSide('top').length, onSide('bottom').length) + 1) * PIN_PITCH);
 
   const sides: PinSide[] = ['left', 'right', 'top', 'bottom'];
@@ -108,8 +121,9 @@ function boxGeometry(pins: ElementPins): ElementGeometry {
         id: p.spec.id,
         direction: p.direction,
         side,
-        ...pointOnSide(side, (i + 1) * PIN_PITCH, width, height),
+        ...pointOnSide(side, (i + 1 + (side === 'left' || side === 'right' ? BOX_TITLE_ROWS : 0)) * PIN_PITCH, width, height),
         ...(p.spec.label ? { label: p.spec.label } : {}),
+        ...(p.spec.clock ? { clock: true } : {}),
       }),
     ),
   );
@@ -160,6 +174,7 @@ export function computeGeometry(kind: NodeKind, pins: ElementPins): ElementGeome
       return gateGeometry(pins);
     case 'input':
     case 'output':
+    case 'clock':
       return ioGeometry(kind, pins);
     case 'mux':
       return muxGeometry(pins);

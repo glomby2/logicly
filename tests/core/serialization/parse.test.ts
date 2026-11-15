@@ -130,13 +130,13 @@ describe('parseCircuitFile: критические ошибки — файл о�
     const errors = errorsOf(
       variant((d) => {
         d.components[0]!.type = 'UNKNOWN_ELEMENT';
-        d.components[1]!.type = 'CLOCK';
+        d.components[1]!.type = 'UNKNOWN_DEVICE';
         d.components[2]!.type = 'UNKNOWN_ELEMENT';
       }),
     );
     expect(errors).toEqual([
       { code: 'unknown-type', detail: 'UNKNOWN_ELEMENT' },
-      { code: 'unknown-type', detail: 'CLOCK' },
+      { code: 'unknown-type', detail: 'UNKNOWN_DEVICE' },
     ]);
   });
 });

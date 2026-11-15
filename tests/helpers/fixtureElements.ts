@@ -28,12 +28,16 @@ export const TEST_CLOCK: ElementDefinition<ClockProps, ClockState> = {
   },
 };
 
-type DffState = { readonly q: Signal; readonly clk: Signal };
+/** `clk: null` — такт ещё не наблюдался (включение или новый элемент): фронта нет. */
+type DffState = { readonly q: Signal; readonly clk: Signal | null };
 
 /**
  * D-триггер по переднему фронту. Если фронт возможен, но не достоверен (X на CLK сейчас
  * или раньше), Q = join(Q, D). Таблица выбрана так, чтобы `evaluate` был монотонен по X
  * и идемпотентен: повторное вычисление с теми же входами не меняет выходы.
+ *
+ * Первое вычисление после включения только запоминает уровень CLK (фронта нет); если
+ * уровень X — такт по-прежнему считается не наблюдавшимся (иначе повтор дал бы фронт).
  */
 export const TEST_DFF: ElementDefinition<NoProps, DffState> = {
   type: 'TEST_DFF',
@@ -51,13 +55,13 @@ export const TEST_DFF: ElementDefinition<NoProps, DffState> = {
       { id: 'qn', label: 'Q̄' },
     ],
   }),
-  initialState: () => ({ q: 0, clk: 0 }),
+  initialState: () => ({ q: 0, clk: null }),
   evaluate: ({ inputs, state }) => {
     const d = inputs[0] ?? 0;
     const clk = inputs[1] ?? 0;
-    const noEdge = clk === 0 || (state.clk === 1 && clk === 1);
+    const noEdge = state.clk === null || clk === 0 || (state.clk === 1 && clk === 1);
     const rising = state.clk === 0 && clk === 1;
     const q = noEdge ? state.q : rising ? d : join(state.q, d);
-    return { outputs: [q, not(q)], state: { q, clk } };
+    return { outputs: [q, not(q)], state: { q, clk: state.clk === null && clk === 'X' ? null : clk } };
   },
 };
