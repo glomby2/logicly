@@ -33,6 +33,7 @@ export const DEMUX: ElementDefinition<SelectProps> = {
     inputs: [DATA, ...selectPins(selectBits)],
     outputs: channelPins('y', channelCount(selectBits)),
   }),
+  variant: ({ selectBits }) => `1:${channelCount(selectBits)}`,
   evaluate: ({ inputs, props }) => {
     const data = inputs[0] ?? 0;
     const address = readAddress(inputs, 1, props.selectBits);

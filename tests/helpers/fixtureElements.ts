@@ -65,3 +65,18 @@ export const TEST_DFF: ElementDefinition<NoProps, DffState> = {
     return { outputs: [q, not(q)], state: { q, clk: state.clk === null && clk === 'X' ? null : clk } };
   },
 };
+
+/**
+ * Элемент с логическим свойством `value`, но без роли внешнего входа: переключателем
+ * (как INPUT) он быть не должен — переключение определяется по `port`, а не по имени свойства.
+ */
+export const TEST_FLAG: ElementDefinition<{ readonly value: boolean }> = {
+  type: 'TEST_FLAG',
+  label: 'FLAG',
+  description: 'Тестовый элемент с логическим свойством value без роли port',
+  category: 'io',
+  defaultProps: { value: false },
+  propSchema: [{ key: 'value', label: 'Значение', kind: 'boolean' }],
+  pins: () => ({ inputs: [], outputs: [{ id: 'out0' }] }),
+  evaluate: ({ props }) => ({ outputs: [props.value ? 1 : 0] }),
+};

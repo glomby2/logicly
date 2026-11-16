@@ -96,6 +96,11 @@ export interface ElementDefinition<P extends ElementProps = ElementProps, S = un
   /** Внешний вход или выход схемы (INPUT, OUTPUT). Используется таблицей истинности. */
   readonly port?: ElementPort;
   pins(props: P): ElementPins;
+  /**
+   * Конфигурация экземпляра для отображения: «4:1» у MUX, «3:8» у DECODER, «1» у CONSTANT.
+   * Узел редактора показывает её на символе и в `aria-label`. Без неё конфигурация не показывается.
+   */
+  variant?(props: P): string;
   initialState?(props: P): S;
   /**
    * Состояние с неизвестным содержимым памяти (Q = X) — для анализа: таблица истинности

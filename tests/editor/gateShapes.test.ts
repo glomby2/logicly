@@ -30,12 +30,13 @@ describe('реестр символов', () => {
     });
   });
 
-  it('вид узла: вентили, INPUT, OUTPUT, остальное — прямоугольник', () => {
+  it('вид узла: вентили, INPUT, OUTPUT, CONSTANT, MUX, функциональные блоки, остальное — прямоугольник', () => {
     const kinds = Object.fromEntries(BUILTIN_ELEMENTS.map((d) => [d.type, nodeKindOf(d.type)]));
     expect(kinds).toEqual({
       INPUT: 'input',
       OUTPUT: 'output',
       CLOCK: 'clock',
+      CONSTANT: 'constant',
       AND: 'gate',
       OR: 'gate',
       NOT: 'gate',
@@ -46,6 +47,9 @@ describe('реестр символов', () => {
       XNOR: 'gate',
       MUX: 'mux',
       DEMUX: 'mux',
+      DECODER: 'block',
+      ENCODER: 'block',
+      PRIORITY_ENCODER: 'block',
       D_LATCH: 'box',
       D_FLIP_FLOP: 'box',
       T_FLIP_FLOP: 'box',

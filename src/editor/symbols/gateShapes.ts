@@ -1,4 +1,5 @@
 import { PIN_PITCH, type NodeKind } from '../layout/geometry';
+import { BLOCK_SYMBOLS } from './blockShapes';
 import { MUX_SYMBOLS } from './muxShapes';
 
 /*
@@ -28,12 +29,14 @@ const IO_KINDS: ReadonlyMap<string, NodeKind> = new Map([
   ['INPUT', 'input'],
   ['OUTPUT', 'output'],
   ['CLOCK', 'clock'],
+  ['CONSTANT', 'constant'],
 ]);
 
 export function nodeKindOf(type: string): NodeKind {
   if (IO_KINDS.has(type)) return IO_KINDS.get(type)!;
   if (GATE_SYMBOLS.has(type)) return 'gate';
-  return MUX_SYMBOLS.has(type) ? 'mux' : 'box';
+  if (MUX_SYMBOLS.has(type)) return 'mux';
+  return BLOCK_SYMBOLS.has(type) ? 'block' : 'box';
 }
 
 export interface BodyBox {

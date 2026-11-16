@@ -11,17 +11,65 @@ import { TEST_CLOCK, TEST_DFF } from '../../helpers/fixtureElements';
  * в том числе для будущих. Новый элемент автоматически проверяется этими тестами.
  */
 
-/** Варианты свойств: по умолчанию и каждое допустимое значение каждого целого свойства. */
+/** Предел числа сочетаний свойств: больше — значит, перебор стал слишком дорогим для контракта. */
+const MAX_PROP_VARIANTS = 64;
+
+/**
+ * Варианты свойств — декартово произведение: каждое целое свойство пробегает min…max,
+ * каждое логическое — false и true. Значения проходят resolveProps, повторы отбрасываются.
+ */
 function propVariants(definition: ElementDefinition): ElementProps[] {
-  const variants: ElementProps[] = [resolveProps(definition)];
+  let combos: ElementProps[] = [{}];
   for (const spec of definition.propSchema ?? []) {
-    if (spec.kind !== 'integer') continue;
-    for (let value = spec.min; value <= spec.max; value++) {
-      variants.push(resolveProps(definition, { [spec.key]: value }));
+    const values: (number | boolean)[] = [];
+    if (spec.kind === 'boolean') values.push(false, true);
+    else for (let value = spec.min; value <= spec.max; value++) values.push(value);
+    combos = combos.flatMap((combo) => values.map((value) => ({ ...combo, [spec.key]: value })));
+    if (combos.length > MAX_PROP_VARIANTS) {
+      throw new Error(`${definition.type}: больше ${MAX_PROP_VARIANTS} сочетаний свойств`);
     }
   }
-  return variants;
+  const unique = new Map<string, ElementProps>();
+  for (const props of [resolveProps(definition), ...combos.map((combo) => resolveProps(definition, combo))]) {
+    unique.set(JSON.stringify(props), props);
+  }
+  return [...unique.values()];
 }
+
+/** Фикстура для мета-тестов перебора: целое и логическое свойство. */
+const fixtureWithProps = (max: number): ElementDefinition => ({
+  type: 'PROPS_FIXTURE',
+  label: 'PROPS',
+  description: 'Фикстура перебора свойств',
+  category: 'gates',
+  defaultProps: { width: 1, flag: false },
+  propSchema: [
+    { key: 'width', label: 'Ширина', kind: 'integer', min: 1, max },
+    { key: 'flag', label: 'Флаг', kind: 'boolean' },
+  ],
+  pins: () => ({ inputs: [], outputs: [] }),
+  evaluate: () => ({ outputs: [] }),
+});
+
+describe('перебор свойств', () => {
+  it('декартово произведение целых и логических свойств, включая сочетания вдали от значений по умолчанию', () => {
+    const variants = propVariants(fixtureWithProps(2)).map((p) => JSON.stringify(p)).sort();
+    expect(variants).toEqual(
+      [
+        { width: 1, flag: false },
+        { width: 1, flag: true },
+        { width: 2, flag: false },
+        { width: 2, flag: true },
+      ]
+        .map((p) => JSON.stringify(p))
+        .sort(),
+    );
+  });
+
+  it('слишком много сочетаний — явная ошибка с типом элемента', () => {
+    expect(() => propVariants(fixtureWithProps(MAX_PROP_VARIANTS))).toThrow(/PROPS_FIXTURE/);
+  });
+});
 
 /** До такого числа входов монотонность дополнительно проверяется перебором всех пар наборов (9ⁿ). */
 const PAIRWISE_LIMIT = 4;
@@ -141,6 +189,20 @@ describe.each(CHECKED_ELEMENTS.map((d) => [d.type, d] as const))('контрак
     for (const key of definition.interactiveProps ?? []) {
       expect(definition.defaultProps).toHaveProperty(key);
     }
+  });
+
+  it('variant (если задан): непустая детерминированная строка, разная для разных наборов пинов', () => {
+    const { variant } = definition;
+    if (!variant) return;
+    const byLayout = new Map<string, string>();
+    for (const props of propVariants(definition)) {
+      const text = variant(props);
+      expect(text, JSON.stringify(props)).not.toBe('');
+      expect(variant(props)).toBe(text);
+      const { inputs, outputs } = definition.pins(props);
+      byLayout.set(JSON.stringify([inputs.map((p) => p.id), outputs.map((p) => p.id)]), text);
+    }
+    expect(new Set(byLayout.values()).size).toBe(byLayout.size);
   });
 
   it('id пинов уникальны', () => {

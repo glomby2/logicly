@@ -3,6 +3,7 @@ import { channelMatch, DEMUX, MAX_SELECT_BITS, MIN_SELECT_BITS, MUX, readAddress
 import type { KnownSignal, Signal } from '@/core/logic/signal';
 import type { ElementDefinition } from '@/core/types/element';
 import { combinations, knownCombinations, ternaryCombinations } from '../../helpers/combinations';
+import { exactExtension } from '../../helpers/exactExtension';
 
 /*
  * Комбинационные элементы с входами выбора: MUX (и DEMUX).
@@ -16,22 +17,6 @@ const run = (definition: ElementDefinition, selectBits: number, inputs: readonly
 
 /** Адрес по битам выбора: s0 — младший разряд. */
 const address = (select: readonly KnownSignal[]) => select.reduce<number>((sum, bit, i) => sum + bit * 2 ** i, 0);
-
-/**
- * Точное троичное расширение: каждый выход — общее значение по всем способам заменить X
- * на 0 или 1 (иначе X). Строже этого монотонный элемент быть не может.
- */
-function exactExtension(f: (inputs: readonly KnownSignal[]) => readonly Signal[], inputs: readonly Signal[]): Signal[] {
-  const unknown = inputs.flatMap((v, i) => (v === 'X' ? [i] : []));
-  let result: Signal[] | undefined;
-  for (const fill of knownCombinations(unknown.length)) {
-    const known = inputs.map((v) => (v === 'X' ? 0 : v)) as KnownSignal[];
-    unknown.forEach((index, k) => (known[index] = fill[k]!));
-    const outputs = f(known);
-    result = result ? result.map((v, i) => (v === outputs[i] ? v : 'X')) : [...outputs];
-  }
-  return result!;
-}
 
 /** Совпадение адреса на входах выбора с каждым каналом. */
 const matches = (select: readonly Signal[]) => {
@@ -91,6 +76,10 @@ describe('MUX', () => {
     const select = Array.from({ length: bits }, (_, i) => ({ id: `s${i}`, label: `S${i}`, side: 'bottom' }));
     expect(inputs).toEqual([...data, ...select]);
     expect(outputs).toEqual([{ id: 'y', label: 'Y' }]);
+  });
+
+  it('конфигурация (variant): 2:1, 4:1, 8:1', () => {
+    expect(BITS.map((bits) => MUX.variant!({ selectBits: bits }))).toEqual(['2:1', '4:1', '8:1']);
   });
 
   it('id пинов стабильны при смене разрядности: d0, d1, s0 сохраняются', () => {
@@ -171,6 +160,10 @@ describe('DEMUX', () => {
     const select = Array.from({ length: bits }, (_, i) => ({ id: `s${i}`, label: `S${i}`, side: 'bottom' }));
     expect(inputs).toEqual([{ id: 'd', label: 'D' }, ...select]);
     expect(outputs).toEqual(Array.from({ length: 2 ** bits }, (_, i) => ({ id: `y${i}`, label: `Y${i}` })));
+  });
+
+  it('конфигурация (variant): 1:2, 1:4, 1:8', () => {
+    expect(BITS.map((bits) => DEMUX.variant!({ selectBits: bits }))).toEqual(['1:2', '1:4', '1:8']);
   });
 
   it('id выходов стабильны при смене разрядности: y0, y1 сохраняются', () => {

@@ -113,6 +113,116 @@ describe('DEMUX: смена разрядности', () => {
   });
 });
 
+describe('DECODER, ENCODER, PRIORITY ENCODER: смена разрядности', () => {
+  /** Элемент `type` с разрядностью 3; к каждому входу — INPUT, с каждого выхода — OUTPUT. */
+  function wired(type: string) {
+    const t = setup();
+    const e = t.c().addComponent(type, { x: 100, y: 0 }, { codeBits: 3 });
+    const pins = t.app.registry.require(type).pins({ codeBits: 3 });
+    for (const p of pins.inputs) t.c().connect(out(t.c().addComponent('INPUT', { x: 0, y: 0 })), pin(e, p.id));
+    for (const p of pins.outputs) t.c().connect(pin(e, p.id), pin(t.c().addComponent('OUTPUT', { x: 200, y: 0 }), 'in0'));
+    /** Пины элемента, к которым подходят провода. */
+    const wiredPins = () =>
+      t.c().circuit.wires.flatMap((w) => (w.to.componentId === e ? [w.to.pinId] : w.from.componentId === e ? [w.from.pinId] : [])).sort();
+    return { ...t, e, wiredPins };
+  }
+
+  it.each([
+    ['DECODER', ['a0', 'a1', 'y0', 'y1', 'y2', 'y3']],
+    ['ENCODER', ['a0', 'a1', 'd0', 'd1', 'd2', 'd3']],
+    ['PRIORITY_ENCODER', ['a0', 'a1', 'd0', 'd1', 'd2', 'd3', 'v']],
+  ])('%s 3 → 2: провода исчезнувших пинов удаляются, остальные сохраняются; один шаг истории; undo/redo', (type, kept) => {
+    const t = wired(type);
+    const all = t.wiredPins();
+    const before = { structure: t.c().structureVersion, past: t.c().history.past.length, compilations: t.simulation().compilations };
+
+    t.c().updateProps(t.e, { codeBits: 2 });
+    expect(t.props(t.e)).toEqual({ codeBits: 2 });
+    expect(t.wiredPins()).toEqual([...kept].sort());
+    expect(t.c().structureVersion).toBe(before.structure + 1);
+    expect(t.c().history.past).toHaveLength(before.past + 1);
+    expect(t.simulation().compilations).toBe(before.compilations + 1);
+
+    t.c().undo();
+    expect(t.props(t.e)).toEqual({ codeBits: 3 });
+    expect(t.wiredPins()).toEqual(all);
+    t.c().redo();
+    expect(t.wiredPins()).toEqual([...kept].sort());
+  });
+
+  it('DECODER 2 → 3: все провода сохраняются, адрес прежний', () => {
+    const t = setup();
+    const a1 = t.c().addComponent('INPUT', { x: 0, y: 0 }, { value: true });
+    const d = t.c().addComponent('DECODER', { x: 100, y: 0 });
+    const led = t.c().addComponent('OUTPUT', { x: 200, y: 0 });
+    t.c().connect(out(a1), pin(d, 'a1'));
+    t.c().connect(pin(d, 'y2'), pin(led, 'in0'));
+    expect(t.signal(pin(d, 'y2'))).toBe(1);
+    const wires = t.wireIds();
+
+    t.c().updateProps(d, { codeBits: 3 });
+    expect(t.wireIds()).toEqual(wires);
+    // A2 не подключён (0): по-прежнему адрес 2.
+    expect([0, 1, 2, 3, 4, 5, 6, 7].map((k) => t.signal(pin(d, `y${k}`)))).toEqual([0, 0, 1, 0, 0, 0, 0, 0]);
+  });
+
+  it('смена разрядности DECODER не сбрасывает триггер соседней части схемы (exportState)', () => {
+    const t = setup();
+    const k = t.c().addComponent('CONSTANT', { x: 0, y: 0 });
+    const c = t.c().addComponent('INPUT', { x: 0, y: 0 });
+    const f = t.c().addComponent('D_FLIP_FLOP', { x: 100, y: 0 });
+    const d = t.c().addComponent('DECODER', { x: 100, y: 200 });
+    t.c().connect(out(k), pin(f, 'd'));
+    t.c().connect(out(c), pin(f, 'clk'));
+    t.c().connect(pin(f, 'q'), pin(d, 'a0'));
+    t.app.commands.toggleInput(c); // фронт: Q = 1
+    expect(t.signal(pin(f, 'q'))).toBe(1);
+    expect(t.signal(pin(d, 'y1'))).toBe(1);
+    const compilations = t.simulation().compilations;
+
+    t.c().updateProps(d, { codeBits: 3 });
+    expect(t.simulation().compilations).toBe(compilations + 1);
+    expect(t.signal(pin(f, 'q'))).toBe(1);
+    expect(t.signal(pin(d, 'y1'))).toBe(1);
+  });
+});
+
+describe('CONSTANT в хранилищах', () => {
+  it('смена уровня — свойство без смены пинов: propsVersion, без перекомпиляции, шаг истории; undo', () => {
+    const t = setup();
+    const k = t.c().addComponent('CONSTANT', { x: 0, y: 0 });
+    const g = t.c().addComponent('NOT', { x: 100, y: 0 });
+    t.c().connect(out(k), pin(g, 'in0'));
+    expect(t.props(k)).toEqual({ level: true });
+    expect([t.signal(out(k)), t.signal(out(g))]).toEqual([1, 0]);
+    const before = {
+      structure: t.c().structureVersion,
+      props: t.c().propsVersion,
+      past: t.c().history.past.length,
+      compilations: t.simulation().compilations,
+    };
+
+    t.c().updateProps(k, { level: false });
+    expect([t.signal(out(k)), t.signal(out(g))]).toEqual([0, 1]);
+    expect(t.c().structureVersion).toBe(before.structure);
+    expect(t.c().propsVersion).toBe(before.props + 1);
+    expect(t.c().history.past).toHaveLength(before.past + 1);
+    expect(t.simulation().compilations).toBe(before.compilations);
+
+    t.c().undo();
+    expect(t.props(k)).toEqual({ level: true });
+    expect(t.signal(out(k))).toBe(1);
+  });
+
+  it('команда переключения INPUT не меняет CONSTANT', () => {
+    const t = setup();
+    const k = t.c().addComponent('CONSTANT', { x: 0, y: 0 });
+    const before = t.c().circuit;
+    t.app.commands.toggleInput(k);
+    expect(t.c().circuit).toBe(before);
+  });
+});
+
 describe('D-защёлка на MUX', () => {
   it('хранит значение и сохраняет его при перекомпиляции соседней части схемы', () => {
     const t = setup();

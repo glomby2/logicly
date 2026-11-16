@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { BUILTIN_ELEMENTS, ElementRegistry } from '@/core/elements';
+import { TEST_FLAG } from '../helpers/fixtureElements';
 import { createTestApp, inp, out } from '../helpers/stores';
 
 describe('команды приложения', () => {
@@ -50,6 +52,14 @@ describe('команды приложения', () => {
     const before = circuit().circuit;
     app.commands.toggleInput(g);
     app.commands.toggleInput('missing');
+    expect(circuit().circuit).toBe(before);
+  });
+
+  it('toggleInput определяет переключатель по роли port: логическое value без port не переключается', () => {
+    const { app, circuit } = createTestApp({ registry: new ElementRegistry([...BUILTIN_ELEMENTS, TEST_FLAG]) });
+    const flag = app.commands.placeElement('TEST_FLAG', { x: 0, y: 0 });
+    const before = circuit().circuit;
+    app.commands.toggleInput(flag);
     expect(circuit().circuit).toBe(before);
   });
 

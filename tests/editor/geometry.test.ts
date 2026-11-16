@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   AND,
   CLOCK,
+  CONSTANT,
   createDefaultRegistry,
   D_FLIP_FLOP,
+  DECODER,
   D_LATCH,
   DEMUX,
   INPUT,
@@ -14,6 +16,7 @@ import {
   T_FLIP_FLOP,
 } from '@/core/elements';
 import { BOX_TITLE_ROWS, computeGeometry, PIN_PITCH } from '@/editor/layout/geometry';
+import { BLOCK_SYMBOLS, blockWidth } from '@/editor/symbols/blockShapes';
 
 const registry = createDefaultRegistry();
 const gatePins = (inputCount: number) => AND.pins({ inputCount });
@@ -122,7 +125,73 @@ describe('computeGeometry: CLOCK и триггеры', () => {
   });
 });
 
+describe('computeGeometry: функциональный блок и CONSTANT', () => {
+  const blockOf = (type: string, codeBits: number) =>
+    computeGeometry('block', registry.require(type).pins({ codeBits }), { width: blockWidth(type) });
+  const ys = (geometry: ReturnType<typeof blockOf>, side: 'left' | 'right') =>
+    geometry.pins.filter((p) => p.side === side).map((p) => [p.id, p.y]);
+  const range = (prefix: string, count: number, firstY: number) =>
+    Array.from({ length: count }, (_, i) => [`${prefix}${i}`, firstY + i * PIN_PITCH]);
+
+  it.each([
+    ['DECODER', 2, 100, 120, range('a', 2, 60), range('y', 4, 40)],
+    ['DECODER', 3, 100, 200, range('a', 3, 80), range('y', 8, 40)],
+    ['ENCODER', 2, 100, 120, range('d', 4, 40), range('a', 2, 60)],
+    ['ENCODER', 3, 100, 200, range('d', 8, 40), range('a', 3, 80)],
+    ['PRIORITY_ENCODER', 2, 140, 120, range('d', 4, 40), [...range('a', 2, 40), ['v', 80]]],
+    ['PRIORITY_ENCODER', 3, 140, 200, range('d', 8, 40), [...range('a', 3, 80), ['v', 140]]],
+  ])('%s, %i разряда: %i×%i; короткая сторона — посередине тела, на сетке', (type, bits, width, height, left, right) => {
+    const geometry = blockOf(type, bits);
+    expect(geometry).toMatchObject({ kind: 'block', width, height });
+    expect(ys(geometry, 'left')).toEqual(left);
+    expect(ys(geometry, 'right')).toEqual(right);
+  });
+
+  it('пины блоков: на сетке, под полосой названия, в границах узла; id — из определения', () => {
+    for (const type of ['DECODER', 'ENCODER', 'PRIORITY_ENCODER']) {
+      for (const bits of [2, 3]) {
+        const pins = registry.require(type).pins({ codeBits: bits });
+        const geometry = blockOf(type, bits);
+        expect(geometry.pins.map((p) => p.id)).toEqual([...pins.inputs, ...pins.outputs].map((p) => p.id));
+        for (const pin of geometry.pins) {
+          expect(pin.y % PIN_PITCH).toBe(0);
+          expect(pin.y).toBeGreaterThanOrEqual((BOX_TITLE_ROWS + 1) * PIN_PITCH);
+          expect(pin.y).toBeLessThan(geometry.height);
+          expect(pin.x === 0 || pin.x === geometry.width).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('ширина блока по умолчанию — как у прямоугольника; ширины из реестра символов', () => {
+    expect(computeGeometry('block', DECODER.pins({ codeBits: 2 })).width).toBe(100);
+    expect(Object.fromEntries([...BLOCK_SYMBOLS].map(([type, s]) => [type, s.width]))).toEqual({
+      DECODER: 100,
+      ENCODER: 100,
+      PRIORITY_ENCODER: 140,
+    });
+    expect(blockWidth('AND')).toBeUndefined();
+  });
+
+  it('CONSTANT: 40×40, выход справа по центру', () => {
+    expect(computeGeometry('constant', CONSTANT.pins(CONSTANT.defaultProps))).toEqual({
+      kind: 'constant',
+      width: 40,
+      height: 40,
+      pins: [{ id: 'out0', direction: 'output', side: 'right', x: 40, y: 20 }],
+    });
+  });
+});
+
 describe('computeGeometry: универсальный прямоугольник', () => {
+  it('триггеры и защёлка — прежняя ширина 100 и правые пины Q, Q̄ под полосой названия', () => {
+    for (const definition of [D_FLIP_FLOP, T_FLIP_FLOP, JK_FLIP_FLOP, D_LATCH]) {
+      const geometry = computeGeometry('box', definition.pins({}));
+      expect(geometry).toMatchObject({ kind: 'box', width: 100 });
+      expect(geometry.pins.filter((p) => p.side === 'right').map((p) => p.y)).toEqual([40, 60]);
+    }
+  });
+
   it('учитывает стороны и подписи пинов; боковые пины — под полосой названия', () => {
     const geometry = computeGeometry('box', {
       inputs: [

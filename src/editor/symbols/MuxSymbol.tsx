@@ -1,5 +1,5 @@
 import { HANDLE_SIZE, type ElementGeometry, type PinGeometry } from '../layout/geometry';
-import { muxBodyPath, muxBottomEdgeY, muxRatio, type MuxOrientation } from './muxShapes';
+import { muxBodyPath, muxBottomEdgeY, type MuxOrientation } from './muxShapes';
 import { SELECTED_FILTER, SYMBOL_FILL, SYMBOL_STROKE } from './symbolStyle';
 
 interface MuxSymbolProps {
@@ -7,6 +7,8 @@ interface MuxSymbolProps {
   readonly geometry: Pick<ElementGeometry, 'width' | 'height' | 'pins'>;
   /** Название типа: MUX, DEMUX. */
   readonly title: string;
+  /** Конфигурация экземпляра (`ElementDefinition.variant`): «4:1», «1:8». */
+  readonly variant?: string;
   readonly selected?: boolean;
   /** Масштаб отображения (превью в палитре). */
   readonly scale?: number;
@@ -40,6 +42,7 @@ export function MuxSymbol({
   orientation,
   geometry,
   title,
+  variant,
   selected = false,
   scale = 1,
   labels = true,
@@ -84,17 +87,19 @@ export function MuxSymbol({
           >
             {title}
           </text>
-          <text
-            x={width / 2}
-            y={height / 2 + 3}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fill={PIN_LABEL_COLOR}
-            fontSize={9}
-            data-testid="mux-ratio"
-          >
-            {muxRatio(geometry)}
-          </text>
+          {variant && (
+            <text
+              x={width / 2}
+              y={height / 2 + 3}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill={PIN_LABEL_COLOR}
+              fontSize={9}
+              data-testid="mux-ratio"
+            >
+              {variant}
+            </text>
+          )}
           {pins
             .filter((pin) => pin.label)
             .map((pin) => (

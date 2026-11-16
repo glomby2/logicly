@@ -229,6 +229,77 @@ describe('MUX и DEMUX', () => {
   });
 });
 
+describe('DECODER, ENCODER, PRIORITY ENCODER и CONSTANT', () => {
+  /** INPUT `<prefix>i` на входы `<pin>i` элемента E и OUTPUT на его выходы; подписи — id. */
+  function wired(type: string, codeBits: number, inputPrefix: string) {
+    const b = new CircuitBuilder().add('E', type, { codeBits });
+    const pins = registry.require(type).pins({ codeBits });
+    pins.inputs.forEach((p, i) => b.input(`${inputPrefix}${i}`).wire(`${inputPrefix}${i}`, `E.${p.id}`));
+    const outputs = pins.outputs.map((p) => p.label!);
+    pins.outputs.forEach((p) => b.output(p.label!).wire(`E.${p.id}`, p.label!));
+    return { t: table(observe(b)), outputs };
+  }
+  const values = (row: TruthTable['rows'][number]) =>
+    row.outputs.map((cell) => (cell.kind === 'value' ? cell.value : cell.kind));
+  /** Номер по значениям столбцов: столбец i — разряд i. */
+  const number = (bits: readonly (0 | 1)[]) => bits.reduce<number>((sum, bit, i) => sum + bit * 2 ** i, 0);
+
+  it('DECODER 3:8: 8 строк, в каждой ровно одна 1 — на выходе с номером кода (A0 — младший)', () => {
+    const { t } = wired('DECODER', 3, 'A');
+    expect(labels(t)).toEqual([['A0', 'A1', 'A2'], ['Y0', 'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6', 'Y7']]);
+    expect(t.rows).toHaveLength(8);
+    for (const row of t.rows) {
+      const outputs = values(row);
+      expect(outputs.filter((v) => v === 1), row.inputs.join('')).toHaveLength(1);
+      expect(outputs.indexOf(1)).toBe(number(row.inputs));
+    }
+    expect(t.warnings).toEqual([]);
+  });
+
+  it('PRIORITY ENCODER 8:3: 256 строк — номер старшего активного входа и V', () => {
+    const { t } = wired('PRIORITY_ENCODER', 3, 'D');
+    expect(labels(t)[1]).toEqual(['A0', 'A1', 'A2', 'V']);
+    expect(t.rows).toHaveLength(256);
+    for (const row of t.rows) {
+      const highest = row.inputs.lastIndexOf(1);
+      const expected = highest < 0 ? [0, 0, 0, 0] : [highest & 1, (highest >> 1) & 1, (highest >> 2) & 1, 1];
+      expect(values(row), row.inputs.join('')).toEqual(expected);
+    }
+    expect(codes(t)).not.toContain('memory');
+    expect(codes(t)).not.toContain('unknown');
+  });
+
+  it('ENCODER 4:2: столбец D0 на выходы не влияет', () => {
+    const { t } = wired('ENCODER', 2, 'D');
+    expect(t.rows).toHaveLength(16);
+    const byRest = new Map<string, unknown>();
+    for (const row of t.rows) {
+      const rest = row.inputs.slice(1).join('');
+      const outputs = JSON.stringify(values(row));
+      if (byRest.has(rest)) expect(outputs, rest).toBe(byRest.get(rest));
+      else byRest.set(rest, outputs);
+    }
+    expect(byRest.size).toBe(8);
+  });
+
+  it('CONSTANT — не столбец входа: MUX с D0 = 0, D1 = 1 от CONSTANT зависит только от S (2 строки)', () => {
+    const b = new CircuitBuilder()
+      .add('K0', 'CONSTANT', { level: false })
+      .add('K1', 'CONSTANT', { level: true })
+      .input('S')
+      .add('M', 'MUX', { selectBits: 1 })
+      .wire('K0', 'M.d0')
+      .wire('K1', 'M.d1')
+      .wire('S', 'M.s0')
+      .output('Y')
+      .wire('M.y', 'Y');
+    const t = table(observe(b));
+    expect(labels(t)).toEqual([['S'], ['Y']]);
+    expect(rows(t)).toEqual(['0|0', '1|1']);
+    expect(t.warnings).toEqual([]);
+  });
+});
+
 describe('триггеры и защёлки (unknownState)', () => {
   it.each(['D_FLIP_FLOP', 'T_FLIP_FLOP'])('%s: Q зависит от прошлого во всех строках — «↺», после сброса 0', (type) => {
     const data = type === 'D_FLIP_FLOP' ? 'd' : 't';

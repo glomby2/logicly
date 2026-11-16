@@ -8,6 +8,7 @@ describe('ElementRegistry', () => {
       'INPUT',
       'OUTPUT',
       'CLOCK',
+      'CONSTANT',
       'AND',
       'OR',
       'NOT',
@@ -18,12 +19,15 @@ describe('ElementRegistry', () => {
       'XNOR',
       'MUX',
       'DEMUX',
+      'DECODER',
+      'ENCODER',
+      'PRIORITY_ENCODER',
       'D_LATCH',
       'D_FLIP_FLOP',
       'T_FLIP_FLOP',
       'JK_FLIP_FLOP',
     ]);
-    expect(BUILTIN_ELEMENTS).toHaveLength(17);
+    expect(BUILTIN_ELEMENTS).toHaveLength(21);
   });
 
   it('get / has / require', () => {

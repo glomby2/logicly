@@ -322,3 +322,60 @@ describe('элементы реестра в схемах', () => {
     expectFixpoint(engine);
   });
 });
+
+describe('нет фантомных фронтов от DECODER и CONSTANT', () => {
+  // Y0 DECODER с неподключёнными входами и CONSTANT 1 равны 1 уже в первом расчёте после включения.
+  // Первое вычисление такта у триггера только запоминает уровень — фронта нет.
+
+  it('Y0 DECODER (входы не подключены) → CLK: при включении и после reset() Q = 0', () => {
+    const circuit = new CircuitBuilder()
+      .add('DEC', 'DECODER', { codeBits: 2 })
+      .add('K', 'CONSTANT', { level: true })
+      .add('F', 'D_FLIP_FLOP')
+      .wire('DEC.y0', 'F.clk')
+      .wire('K', 'F.d')
+      .build();
+    for (const variant of [circuit, reversed(circuit)]) {
+      const { engine } = simulate(variant, registry());
+      expect([read(engine, 'DEC.y0'), read(engine, 'F.q'), read(engine, 'F.qn')]).toEqual([1, 0, 1]);
+      engine.reset();
+      engine.settle();
+      expect([read(engine, 'DEC.y0'), read(engine, 'F.q')]).toEqual([1, 0]);
+    }
+  });
+
+  it('настоящий фронт на Y0 срабатывает: A0 1 → 0 переводит Y0 0 → 1, Q = D', () => {
+    const circuit = new CircuitBuilder()
+      .input('A0')
+      .add('DEC', 'DECODER', { codeBits: 2 })
+      .add('K', 'CONSTANT', { level: true })
+      .add('F', 'D_FLIP_FLOP')
+      .wire('A0', 'DEC.a0')
+      .wire('DEC.y0', 'F.clk')
+      .wire('K', 'F.d')
+      .build();
+    const { engine } = simulate(circuit, registry());
+    expect(read(engine, 'F.q')).toBe(0);
+    setInput(engine, 'A0', 1);
+    expect([read(engine, 'DEC.y0'), read(engine, 'F.q')]).toEqual([0, 0]);
+    setInput(engine, 'A0', 0);
+    expect([read(engine, 'DEC.y0'), read(engine, 'F.q')]).toEqual([1, 1]);
+  });
+
+  it('CONSTANT 1 прямо на CLK: при включении и после reset() Q = 0', () => {
+    const circuit = new CircuitBuilder()
+      .add('K', 'CONSTANT', { level: true })
+      .input('D', true)
+      .add('F', 'D_FLIP_FLOP')
+      .wire('K', 'F.clk')
+      .wire('D', 'F.d')
+      .build();
+    for (const variant of [circuit, reversed(circuit)]) {
+      const { engine } = simulate(variant, registry());
+      expect(read(engine, 'F.q')).toBe(0);
+      engine.reset();
+      engine.settle();
+      expect(read(engine, 'F.q')).toBe(0);
+    }
+  });
+});

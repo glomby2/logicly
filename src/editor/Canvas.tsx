@@ -44,8 +44,10 @@ const MINIMAP_COLORS: Record<NodeKind, string> = {
   input: '#a7f3d0',
   output: '#fde68a',
   clock: '#a7f3d0',
+  constant: '#a7f3d0',
   gate: '#cbd5e1',
   mux: '#cbd5e1',
+  block: '#cbd5e1',
   box: '#94a3b8',
 };
 

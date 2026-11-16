@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DEMUX, MUX } from '@/core/elements';
+import { createDefaultRegistry, DEMUX, MUX } from '@/core/elements';
+import { toFlowNode } from '@/editor/adapters/flowMapping';
 import { computeGeometry } from '@/editor/layout/geometry';
-import { MUX_SYMBOLS, muxBodyPath, muxBottomEdgeY, muxInset, muxRatio, type MuxOrientation } from '@/editor/symbols/muxShapes';
+import { MUX_SYMBOLS, muxBodyPath, muxBottomEdgeY, muxInset, type MuxOrientation } from '@/editor/symbols/muxShapes';
 
+const registry = createDefaultRegistry();
 const numbers = (path: string) => path.match(/-?\d+(\.\d+)?/g)!.map(Number);
 const geometryOf = (definition: typeof MUX, selectBits: number) => computeGeometry('mux', definition.pins({ selectBits }));
 
@@ -63,8 +65,10 @@ describe('символы MUX и DEMUX', () => {
     }
   });
 
-  it('конфигурация по пинам: MUX 2:1, 4:1, 8:1; DEMUX 1:2, 1:4, 1:8', () => {
-    expect([1, 2, 3].map((bits) => muxRatio(geometryOf(MUX, bits)))).toEqual(['2:1', '4:1', '8:1']);
-    expect([1, 2, 3].map((bits) => muxRatio(geometryOf(DEMUX, bits)))).toEqual(['1:2', '1:4', '1:8']);
+  it('конфигурация на символе (variant узла): MUX 2:1, 4:1, 8:1; DEMUX 1:2, 1:4, 1:8', () => {
+    const variantOf = (type: string, selectBits: number) =>
+      toFlowNode({ id: 'm', type, position: { x: 0, y: 0 }, props: { selectBits } }, registry, false).data.variant;
+    expect([1, 2, 3].map((bits) => variantOf('MUX', bits))).toEqual(['2:1', '4:1', '8:1']);
+    expect([1, 2, 3].map((bits) => variantOf('DEMUX', bits))).toEqual(['1:2', '1:4', '1:8']);
   });
 });

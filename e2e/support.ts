@@ -98,6 +98,7 @@ export type FileComponentSpec = readonly [
 
 const GATES = ['AND', 'OR', 'NAND', 'NOR', 'XOR', 'XNOR'];
 const SELECTORS = ['MUX', 'DEMUX'];
+const CODERS = ['DECODER', 'ENCODER', 'PRIORITY_ENCODER'];
 const defaultProps = (type: string): Record<string, number | boolean> =>
   type === 'INPUT'
     ? { value: false }
@@ -105,9 +106,13 @@ const defaultProps = (type: string): Record<string, number | boolean> =>
       ? { inputCount: 2 }
       : SELECTORS.includes(type)
         ? { selectBits: 1 }
-        : type === 'CLOCK'
-          ? { halfPeriod: 1 }
-          : {};
+        : CODERS.includes(type)
+          ? { codeBits: 2 }
+          : type === 'CLOCK'
+            ? { halfPeriod: 1 }
+            : type === 'CONSTANT'
+              ? { level: true }
+              : {};
 
 /** Документ `.lsim`: элементы и провода `'A' → 'G.in1'` (выход по умолчанию `out0`, вход — `in0`). */
 export function circuitFile(name: string, components: readonly FileComponentSpec[], wires: readonly [string, string][]) {

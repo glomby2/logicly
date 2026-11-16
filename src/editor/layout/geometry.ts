@@ -7,9 +7,16 @@ export const HANDLE_SIZE = 12;
 
 /**
  * Вид узла на поле: вентиль с ANSI-символом, переключатель, индикатор, генератор тактов,
- * трапеция MUX / DEMUX или универсальный прямоугольник.
+ * постоянный уровень, трапеция MUX / DEMUX, функциональный блок (DECODER, ENCODER)
+ * или универсальный прямоугольник.
  */
-export type NodeKind = 'gate' | 'input' | 'output' | 'clock' | 'mux' | 'box';
+export type NodeKind = 'gate' | 'input' | 'output' | 'clock' | 'constant' | 'mux' | 'block' | 'box';
+
+/** Параметры геометрии, зависящие от типа элемента (задаются реестрами символов). */
+export interface GeometryOptions {
+  /** Ширина функционального блока (`block`); по умолчанию — как у прямоугольника. */
+  readonly width?: number;
+}
 
 export interface PinGeometry {
   readonly id: string;
@@ -34,7 +41,8 @@ const GATE_WIDTH = 80;
 const IO_HEIGHT = 40;
 const INPUT_WIDTH = 72;
 const OUTPUT_WIDTH = 56;
-const BOX_WIDTH = 100;
+const CONSTANT_WIDTH = 40;
+export const BOX_WIDTH = 100;
 const MUX_WIDTH = 80;
 
 function pointOnSide(side: PinSide, offset: number, width: number, height: number) {
@@ -77,9 +85,11 @@ function gateGeometry(pins: ElementPins): ElementGeometry {
   return { kind: 'gate', width: GATE_WIDTH, height, pins: [...inputs, ...outputs] };
 }
 
-/** INPUT, CLOCK (выход справа) и OUTPUT (вход слева): пин по центру стороны. */
-function ioGeometry(kind: 'input' | 'output' | 'clock', pins: ElementPins): ElementGeometry {
-  const width = kind === 'output' ? OUTPUT_WIDTH : INPUT_WIDTH;
+const IO_WIDTH = { input: INPUT_WIDTH, output: OUTPUT_WIDTH, clock: INPUT_WIDTH, constant: CONSTANT_WIDTH } as const;
+
+/** INPUT, CLOCK, CONSTANT (выход справа) и OUTPUT (вход слева): пин по центру стороны. */
+function ioGeometry(kind: keyof typeof IO_WIDTH, pins: ElementPins): ElementGeometry {
+  const width = IO_WIDTH[kind];
   const center = IO_HEIGHT / 2;
   return {
     kind,
@@ -100,11 +110,22 @@ function ioGeometry(kind: 'input' | 'output' | 'clock', pins: ElementPins): Elem
  */
 export const BOX_TITLE_ROWS = 1;
 
+interface RectOptions {
+  readonly width: number;
+  /**
+   * Пины боковой стороны, где их меньше, ставятся посередине тела (под полосой названия),
+   * со сдвигом на целое число шагов: координаты остаются на сетке, при нечётной разнице
+   * набор сдвинут вверх на полшага.
+   */
+  readonly centerShortSide: boolean;
+}
+
 /**
- * Универсальный прямоугольник: пины на сторонах из `PinSpec.side` (входы слева, выходы справа
- * по умолчанию). Сверху — полоса названия, пины боковых сторон начинаются под ней.
+ * Прямоугольник с полосой названия сверху: пины на сторонах из `PinSpec.side` (входы слева,
+ * выходы справа по умолчанию), пины боковых сторон — под полосой. Общая геометрия
+ * универсального прямоугольника (`box`) и функционального блока (`block`).
  */
-function boxGeometry(pins: ElementPins): ElementGeometry {
+function rectGeometry(pins: ElementPins, kind: 'box' | 'block', options: RectOptions): ElementGeometry {
   const all = [
     ...pins.inputs.map((spec) => ({ spec, direction: 'input' as const, side: spec.side ?? 'left' })),
     ...pins.outputs.map((spec) => ({ spec, direction: 'output' as const, side: spec.side ?? 'right' })),
@@ -112,22 +133,28 @@ function boxGeometry(pins: ElementPins): ElementGeometry {
   const onSide = (side: PinSide) => all.filter((p) => p.side === side);
   const rows = Math.max(onSide('left').length, onSide('right').length, 1);
   const height = (rows + 1 + BOX_TITLE_ROWS) * PIN_PITCH;
-  const width = Math.max(BOX_WIDTH, (Math.max(onSide('top').length, onSide('bottom').length) + 1) * PIN_PITCH);
+  const width = Math.max(options.width, (Math.max(onSide('top').length, onSide('bottom').length) + 1) * PIN_PITCH);
 
+  const sideRow = (side: PinSide, count: number) => {
+    if (side !== 'left' && side !== 'right') return 0;
+    return BOX_TITLE_ROWS + (options.centerShortSide ? Math.floor((rows - count) / 2) : 0);
+  };
   const sides: PinSide[] = ['left', 'right', 'top', 'bottom'];
-  const placed = sides.flatMap((side) =>
-    onSide(side).map(
+  const placed = sides.flatMap((side) => {
+    const specs = onSide(side);
+    const first = sideRow(side, specs.length);
+    return specs.map(
       (p, i): PinGeometry => ({
         id: p.spec.id,
         direction: p.direction,
         side,
-        ...pointOnSide(side, (i + 1 + (side === 'left' || side === 'right' ? BOX_TITLE_ROWS : 0)) * PIN_PITCH, width, height),
+        ...pointOnSide(side, (i + 1 + first) * PIN_PITCH, width, height),
         ...(p.spec.label ? { label: p.spec.label } : {}),
         ...(p.spec.clock ? { clock: true } : {}),
       }),
-    ),
-  );
-  return { kind: 'box', width, height, pins: placed };
+    );
+  });
+  return { kind, width, height, pins: placed };
 }
 
 /** Смещения `count` пинов с шагом PIN_PITCH, отцентрированных на стороне длиной `length`. */
@@ -168,17 +195,20 @@ function muxGeometry(pins: ElementPins): ElementGeometry {
   };
 }
 
-export function computeGeometry(kind: NodeKind, pins: ElementPins): ElementGeometry {
+export function computeGeometry(kind: NodeKind, pins: ElementPins, options: GeometryOptions = {}): ElementGeometry {
   switch (kind) {
     case 'gate':
       return gateGeometry(pins);
     case 'input':
     case 'output':
     case 'clock':
+    case 'constant':
       return ioGeometry(kind, pins);
     case 'mux':
       return muxGeometry(pins);
+    case 'block':
+      return rectGeometry(pins, 'block', { width: options.width ?? BOX_WIDTH, centerShortSide: true });
     case 'box':
-      return boxGeometry(pins);
+      return rectGeometry(pins, 'box', { width: BOX_WIDTH, centerShortSide: false });
   }
 }

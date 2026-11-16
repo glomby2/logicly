@@ -76,7 +76,9 @@ export function Palette() {
                 aria-pressed={placement === definition.type}
                 title={definition.description}
                 className={cn(
-                  'flex h-16 flex-col items-center justify-center gap-1 rounded-md border border-slate-700/70 bg-slate-800/60',
+                  // min-h-16: длинное название (PRIORITY ENCODER) переносится на вторую строку,
+                  // и плитка растёт вместо того, чтобы текст вылезал за край.
+                  'flex min-h-16 flex-col items-center justify-center gap-1 rounded-md border border-slate-700/70 bg-slate-800/60 text-center',
                   'cursor-grab text-[11px] font-semibold tracking-wide text-slate-200 active:cursor-grabbing',
                   'hover:border-sky-500/60 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-500',
                   placement === definition.type && 'border-sky-400 bg-sky-500/10 ring-1 ring-sky-400',

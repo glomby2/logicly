@@ -110,6 +110,29 @@ describe('сохранение → загрузка даёт ту же схем�
     expectRoundTrip(circuit, 'Мультиплексоры');
   });
 
+  it('DECODER, ENCODER, PRIORITY ENCODER обеих разрядностей и CONSTANT 0/1 с проводами на пины по роли', () => {
+    const builder = new CircuitBuilder().add('K1', 'CONSTANT', { level: true }).add('K0', 'CONSTANT', { level: false });
+    for (const bits of [2, 3]) {
+      const top = 2 ** bits - 1;
+      builder
+        .add(`DEC${bits}`, 'DECODER', { codeBits: bits })
+        .add(`ENC${bits}`, 'ENCODER', { codeBits: bits })
+        .add(`PRI${bits}`, 'PRIORITY_ENCODER', { codeBits: bits })
+        .wire('K1', `DEC${bits}.a${bits - 1}`)
+        .wire('K0', `DEC${bits}.a0`)
+        .wire(`DEC${bits}.y${top}`, `ENC${bits}.d${top}`)
+        .wire(`DEC${bits}.y${top}`, `PRI${bits}.d${top}`)
+        .output(`V${bits}`)
+        .wire(`PRI${bits}.v`, `V${bits}`)
+        .output(`A${bits}`)
+        .wire(`ENC${bits}.a${bits - 1}`, `A${bits}`);
+    }
+    const circuit = normalized(builder.build(), registry);
+    // По 6 проводов на разрядность: нормализация ни одного не удалила.
+    expect(circuit.wires).toHaveLength(2 * 6);
+    expectRoundTrip(circuit, 'Шифраторы');
+  });
+
   it('200 случайных схем', () => {
     const random = createRandom(6);
     for (let trial = 0; trial < 200; trial++) expectRoundTrip(randomCircuit(random), `Схема ${trial}`);

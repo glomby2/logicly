@@ -1,5 +1,5 @@
 import { extractFragment, findComponent, nextLabel, type CircuitFragment } from '@/core/circuit';
-import type { ElementRegistry } from '@/core/elements';
+import { switchProp, type ElementRegistry } from '@/core/elements';
 import {
   baseName,
   isSupportedFileName,
@@ -184,8 +184,10 @@ export function createCommands({
 
     toggleInput(id) {
       const component = findComponent(circuit.getState().circuit, id);
-      const value = component?.props.value;
-      if (typeof value === 'boolean') circuit.getState().updateProps(id, { value: !value });
+      const prop = component && switchProp(registry.get(component.type));
+      if (!component || prop === undefined) return;
+      const value = component.props[prop];
+      if (typeof value === 'boolean') circuit.getState().updateProps(id, { [prop]: !value });
     },
 
     selectAll() {

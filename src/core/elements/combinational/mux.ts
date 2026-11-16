@@ -31,6 +31,7 @@ export const MUX: ElementDefinition<SelectProps> = {
     inputs: [...channelPins('d', channelCount(selectBits)), ...selectPins(selectBits)],
     outputs: OUTPUTS,
   }),
+  variant: ({ selectBits }) => `${channelCount(selectBits)}:1`,
   evaluate: ({ inputs, props }) => {
     const count = channelCount(props.selectBits);
     const address = readAddress(inputs, count, props.selectBits);

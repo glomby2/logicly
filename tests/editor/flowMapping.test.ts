@@ -39,6 +39,37 @@ describe('toFlowNode', () => {
   });
 });
 
+describe('toFlowNode: конфигурация и функциональные блоки', () => {
+  const node = (type: string, props: Record<string, number | boolean> = {}) =>
+    toFlowNode({ id: 'n', type, position: { x: 0, y: 0 }, props }, registry, false);
+
+  it('DECODER 3:8 — блок 100×200 с 11 точками подключения и конфигурацией', () => {
+    const decoder = node('DECODER', { codeBits: 3 });
+    expect(decoder).toMatchObject({ type: 'block', width: 100, height: 200 });
+    expect(decoder.handles).toHaveLength(11);
+    expect(decoder.data.variant).toBe('3:8');
+    expect(decoder.data.title).toBe('DECODER');
+  });
+
+  it('PRIORITY ENCODER — ширина из реестра символов; ENCODER — 4:2 по умолчанию', () => {
+    expect(node('PRIORITY_ENCODER')).toMatchObject({ type: 'block', width: 140, data: { variant: '4:2' } });
+    expect(node('ENCODER').data.variant).toBe('4:2');
+  });
+
+  it('конфигурация вычисляется из нормализованных свойств', () => {
+    expect(node('DECODER', { codeBits: 9 }).data.variant).toBe('3:8');
+    expect(node('MUX', { selectBits: 2 }).data.variant).toBe('4:1');
+    expect(node('MUX').data.variant).toBe('2:1');
+  });
+
+  it('CONSTANT — свой вид узла, конфигурация — уровень; у вентиля конфигурации нет', () => {
+    expect(node('CONSTANT', { level: true })).toMatchObject({ type: 'constant', width: 40, height: 40, data: { variant: '1' } });
+    expect(node('CONSTANT', { level: false }).data.variant).toBe('0');
+    expect(node('AND').data).not.toHaveProperty('variant');
+    expect(node('MYSTERY').data).not.toHaveProperty('variant');
+  });
+});
+
 describe('toFlowEdge', () => {
   it('провод → ребро от выхода к входу', () => {
     expect(toFlowEdge(circuit().wires[0]!, false)).toMatchObject({

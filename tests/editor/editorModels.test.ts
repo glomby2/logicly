@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AND, createDefaultRegistry, INPUT } from '@/core/elements';
+import { AND, CODE_BITS_SPEC, CONSTANT, createDefaultRegistry, DECODER, INPUT } from '@/core/elements';
 import { canConnect } from '@/editor/connectionRules';
 import { buildContextMenu, type MenuEntry } from '@/editor/contextMenuModel';
 import { SELF_LOOP_MARGIN, selfLoopPath } from '@/editor/edges/wirePath';
@@ -16,6 +16,7 @@ import {
 import { SIGNAL_COLORS, signalColor, signalTone } from '@/editor/signalStyle';
 import { groupElements } from '@/features/palette/paletteModel';
 import { CircuitBuilder } from '../helpers/circuitBuilder';
+import { TEST_FLAG } from '../helpers/fixtureElements';
 
 const key = (code: string, extra: Partial<KeyInput> = {}): KeyInput => ({
   key: '',
@@ -115,6 +116,27 @@ describe('контекстное меню', () => {
     expect(entries.some((e) => e.kind === 'prop')).toBe(false);
   });
 
+  it('DECODER: разрядность кода из propSchema, без переключения', () => {
+    const component = { id: 'd', type: 'DECODER', position: { x: 0, y: 0 }, props: { codeBits: 2 } };
+    const entries = buildContextMenu({ kind: 'node', id: 'd' }, { canPaste: false, component, definition: DECODER });
+    expect(commands(entries)).not.toContain('toggle');
+    expect(entries.filter((e) => e.kind === 'prop')).toEqual([{ kind: 'prop', spec: CODE_BITS_SPEC }]);
+  });
+
+  it('CONSTANT: уровень из propSchema, без переключения', () => {
+    const component = { id: 'k', type: 'CONSTANT', position: { x: 0, y: 0 }, props: { level: true } };
+    const entries = buildContextMenu({ kind: 'node', id: 'k' }, { canPaste: false, component, definition: CONSTANT });
+    expect(commands(entries)).toEqual(['rename', 'copy', 'cut', 'duplicate', 'delete']);
+    expect(entries.filter((e) => e.kind === 'prop')).toEqual([{ kind: 'prop', spec: CONSTANT.propSchema![0] }]);
+  });
+
+  it('логическое value без роли port: свойство из propSchema, но без переключения', () => {
+    const component = { id: 'f', type: 'TEST_FLAG', position: { x: 0, y: 0 }, props: { value: false } };
+    const entries = buildContextMenu({ kind: 'node', id: 'f' }, { canPaste: false, component, definition: TEST_FLAG });
+    expect(commands(entries)).not.toContain('toggle');
+    expect(entries.filter((e) => e.kind === 'prop')).toEqual([{ kind: 'prop', spec: TEST_FLAG.propSchema![0] }]);
+  });
+
   it('вентиль: редактируемое число входов из propSchema', () => {
     const component = { id: 'g', type: 'AND', position: { x: 0, y: 0 }, props: { inputCount: 2 } };
     const entries = buildContextMenu({ kind: 'node', id: 'g' }, { canPaste: false, component, definition: AND });
@@ -164,9 +186,9 @@ describe('палитра', () => {
   it('группирует элементы по категориям в порядке реестра', () => {
     const groups = groupElements(createDefaultRegistry().list());
     expect(groups.map((g) => [g.title, g.items.map((d) => d.type)])).toEqual([
-      ['Ввод и вывод', ['INPUT', 'OUTPUT', 'CLOCK']],
+      ['Ввод и вывод', ['INPUT', 'OUTPUT', 'CLOCK', 'CONSTANT']],
       ['Логические вентили', ['AND', 'OR', 'NOT', 'BUFFER', 'NAND', 'NOR', 'XOR', 'XNOR']],
-      ['Комбинационные схемы', ['MUX', 'DEMUX']],
+      ['Комбинационные схемы', ['MUX', 'DEMUX', 'DECODER', 'ENCODER', 'PRIORITY_ENCODER']],
       ['Триггеры и память', ['D_LATCH', 'D_FLIP_FLOP', 'T_FLIP_FLOP', 'JK_FLIP_FLOP']],
     ]);
   });

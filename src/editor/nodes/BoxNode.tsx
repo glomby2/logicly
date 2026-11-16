@@ -15,9 +15,11 @@ const LABEL_GAP = HANDLE_SIZE / 2 + 3;
  * Универсальный символ: прямоугольник с названием в верхней полосе и подписями пинов.
  * Подходит для любого нового элемента. Тактовый вход (`PinSpec.clock`) отмечается
  * значком ▷ (динамический вход, IEEE Std 91) сразу за кружком пина.
+ * Функциональный блок (`block`: DECODER, ENCODER) — тот же символ; если у элемента есть
+ * конфигурация (`variant`, «3:8»), она выводится в центре тела и в `aria-label`.
  */
 export const BoxNode = memo(function BoxNode({ id, data, selected }: NodeProps<ElementNode>) {
-  const { component, geometry, title } = data;
+  const { component, geometry, title, variant } = data;
   return (
     <div
       className={cn(
@@ -25,6 +27,7 @@ export const BoxNode = memo(function BoxNode({ id, data, selected }: NodeProps<E
         selected ? 'border-sky-400' : 'border-slate-400',
       )}
       style={{ width: geometry.width, height: geometry.height }}
+      {...(variant ? { 'aria-label': `${title} ${variant}` } : {})}
       data-testid={`node-${id}`}
       data-type={component.type}
     >
@@ -35,6 +38,15 @@ export const BoxNode = memo(function BoxNode({ id, data, selected }: NodeProps<E
       >
         {title}
       </div>
+      {variant && (
+        <div
+          className="pointer-events-none absolute inset-x-0 -translate-y-1/2 text-center text-[10px] leading-none text-slate-400"
+          style={{ top: (BOX_TITLE_ROWS * PIN_PITCH + geometry.height) / 2 }}
+          data-testid="block-variant"
+        >
+          {variant}
+        </div>
+      )}
       {geometry.pins
         .filter((pin) => pin.clock && pin.side === 'left')
         .map((pin) => (

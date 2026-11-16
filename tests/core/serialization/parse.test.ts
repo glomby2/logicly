@@ -268,4 +268,61 @@ describe('parseCircuitFile: исправимые ошибки — схема н�
       expect(result.warnings).toEqual([{ code: 'props-normalized', count: 2 }]);
     });
   });
+
+  describe('DECODER, ENCODER, PRIORITY ENCODER и CONSTANT', () => {
+    const wire = (id: string, from: string, to: string) => {
+      const [fc = '', fp = ''] = from.split('.');
+      const [tc = '', tp = ''] = to.split('.');
+      return { id, from: { componentId: fc, pinId: fp }, to: { componentId: tc, pinId: tp } };
+    };
+    const document = (codeBits: unknown, level: unknown, wires: ReturnType<typeof wire>[] = []) => ({
+      ...validDocument(),
+      components: [
+        { id: 'k', type: 'CONSTANT', position: { x: 0, y: 0 }, props: { level } },
+        { id: 'd', type: 'DECODER', position: { x: 100, y: 0 }, props: { codeBits } },
+        { id: 'e', type: 'ENCODER', position: { x: 200, y: 0 }, props: { codeBits } },
+        { id: 'p', type: 'PRIORITY_ENCODER', position: { x: 300, y: 0 }, props: { codeBits } },
+      ],
+      wires,
+    });
+    const codeBitsOf = (result: ReturnType<typeof ok>) => result.circuit.components.slice(1).map((c) => c.props);
+
+    it('корректные свойства загружаются без предупреждений', () => {
+      const result = ok(document(3, false, [wire('w1', 'k.out0', 'd.a2'), wire('w2', 'd.y7', 'e.d7'), wire('w3', 'd.y7', 'p.d7')]));
+      expect(result.warnings).toEqual([]);
+      expect(result.circuit.wires).toHaveLength(3);
+      expect(result.circuit.components[0]!.props).toEqual({ level: false });
+    });
+
+    it.each([
+      [5, 3],
+      [1, 2],
+      [2.6, 3],
+      ['2', 2],
+    ])('codeBits = %j нормализуется в %i с предупреждением', (raw, expected) => {
+      const result = ok(document(raw, true));
+      expect(codeBitsOf(result)).toEqual([{ codeBits: expected }, { codeBits: expected }, { codeBits: expected }]);
+      expect(result.warnings).toEqual([{ code: 'props-normalized', count: 3 }]);
+    });
+
+    it('level неверного типа заменяется значением по умолчанию (1)', () => {
+      const result = ok(document(2, 'yes'));
+      expect(result.circuit.components[0]!.props).toEqual({ level: true });
+      expect(result.warnings).toEqual([{ code: 'props-normalized', count: 1 }]);
+    });
+
+    it('провода на несуществующие пины (Y7 у DECODER 2:4, D7 у ENCODER 4:2, A2 у PRIORITY 4:2) удаляются', () => {
+      const result = ok(
+        document(2, true, [
+          wire('w1', 'd.y7', 'e.d0'),
+          wire('w2', 'd.y3', 'e.d7'),
+          wire('w3', 'p.a2', 'e.d1'),
+          wire('w4', 'd.y3', 'e.d3'),
+          wire('w5', 'p.v', 'e.d2'),
+        ]),
+      );
+      expect(result.circuit.wires.map((w) => w.id)).toEqual(['w4', 'w5']);
+      expect(result.warnings).toEqual([{ code: 'wires-removed', count: 3 }]);
+    });
+  });
 });

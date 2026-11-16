@@ -1,7 +1,9 @@
 import type { ElementGeometry } from '@/editor/layout/geometry';
 import { SYMBOL_FILL, SYMBOL_STROKE } from '@/editor/symbols/symbolStyle';
 
-const STUB = 6;
+/** Длина линии пина за краем корпуса, px (до масштабирования). */
+export const BOX_PREVIEW_STUB = 6;
+const STUB = BOX_PREVIEW_STUB;
 const MARK = 8;
 
 /**

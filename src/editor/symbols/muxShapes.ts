@@ -1,4 +1,4 @@
-import { PIN_PITCH, type ElementGeometry } from '../layout/geometry';
+import { PIN_PITCH } from '../layout/geometry';
 
 /*
  * Символы MUX и DEMUX — трапеция: широкая сторона у каналов, узкая — у одиночного пина.
@@ -32,11 +32,4 @@ export function muxBodyPath(orientation: MuxOrientation, width: number, height: 
 export function muxBottomEdgeY(orientation: MuxOrientation, width: number, height: number, x: number): number {
   const t = Math.min(1, Math.max(0, x / width));
   return n(height - muxInset(height) * (orientation === 'narrow-right' ? t : 1 - t));
-}
-
-/** Конфигурация по пинам: «4:1» у MUX (каналы слева : выход), «1:4» у DEMUX. */
-export function muxRatio(geometry: Pick<ElementGeometry, 'pins'>): string {
-  const left = geometry.pins.filter((p) => p.side === 'left').length;
-  const right = geometry.pins.filter((p) => p.side === 'right').length;
-  return `${left}:${right}`;
 }

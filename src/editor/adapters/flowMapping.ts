@@ -1,8 +1,9 @@
 import { Position, type Connection, type Edge, type Node, type NodeHandle } from '@xyflow/react';
 import { getComponentPins } from '@/core/circuit';
-import type { ElementRegistry } from '@/core/elements';
+import { resolveProps, type ElementRegistry } from '@/core/elements';
 import type { Circuit, CircuitComponent, PinRef, Wire } from '@/core/types/circuit';
 import { computeGeometry, HANDLE_SIZE, type ElementGeometry, type NodeKind, type PinGeometry } from '../layout/geometry';
+import { blockWidth } from '../symbols/blockShapes';
 import { nodeKindOf } from '../symbols/gateShapes';
 
 /*
@@ -15,6 +16,8 @@ export type ElementNodeData = {
   readonly geometry: ElementGeometry;
   /** Название типа для отображения (AND, INPUT, …). */
   readonly title: string;
+  /** Конфигурация экземпляра (`ElementDefinition.variant`): «4:1», «3:8»; нет — не показывается. */
+  readonly variant?: string;
 };
 
 export type ElementNode = Node<ElementNodeData, NodeKind>;
@@ -46,16 +49,28 @@ function toHandle(pin: PinGeometry): NodeHandle {
   };
 }
 
+/** Конфигурация экземпляра из определения элемента. */
+export function componentVariant(registry: ElementRegistry, component: CircuitComponent): string | undefined {
+  const definition = registry.get(component.type);
+  return definition?.variant?.(resolveProps(definition, component.props));
+}
+
 export function toFlowNode(component: CircuitComponent, registry: ElementRegistry, selected: boolean): ElementNode {
   const pins = getComponentPins(registry, component) ?? { inputs: [], outputs: [] };
   const kind = nodeKindOf(component.type);
-  const geometry = computeGeometry(kind, pins);
+  const geometry = computeGeometry(kind, pins, { width: blockWidth(component.type) });
   const size = { width: geometry.width, height: geometry.height };
+  const variant = componentVariant(registry, component);
   return {
     id: component.id,
     type: kind,
     position: component.position,
-    data: { component, geometry, title: registry.get(component.type)?.label ?? component.type },
+    data: {
+      component,
+      geometry,
+      title: registry.get(component.type)?.label ?? component.type,
+      ...(variant !== undefined ? { variant } : {}),
+    },
     ...size,
     measured: size,
     handles: geometry.pins.map(toHandle),

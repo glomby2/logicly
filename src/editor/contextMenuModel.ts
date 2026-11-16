@@ -1,3 +1,4 @@
+import { switchProp } from '@/core/elements';
 import type { CircuitComponent, ComponentId, Point, WireId } from '@/core/types/circuit';
 import type { ElementDefinition, PropSpec } from '@/core/types/element';
 import { ru } from '@/i18n/ru';
@@ -63,7 +64,7 @@ export function buildContextMenu(target: MenuTarget, context: MenuContext): Menu
       return [command('delete', ru.menu.deleteWire, { shortcut: 'Del', danger: true })];
     case 'node': {
       const head: MenuEntry[] = [];
-      if (typeof context.component?.props.value === 'boolean') head.push(command('toggle', ru.menu.toggle));
+      if (switchProp(context.definition) !== undefined) head.push(command('toggle', ru.menu.toggle));
       head.push(command('rename', ru.menu.rename));
       const props = (context.definition?.propSchema ?? []).map((spec): MenuEntry => ({ kind: 'prop', spec }));
       return [

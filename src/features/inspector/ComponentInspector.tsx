@@ -67,7 +67,7 @@ export function ComponentInspector({ model }: { model: ComponentModel }) {
       {(model.toggle || model.props.length > 0) && (
         <InspectorSection title={ru.inspector.properties}>
           <div className="space-y-2">
-            {model.toggle && <ToggleRow componentId={component.id} on={component.props.value === true} />}
+            {model.toggle && <ToggleRow componentId={component.id} on={model.toggleOn} />}
             {model.props.map((spec) => (
               <ComponentPropField key={spec.key} componentId={component.id} spec={spec} />
             ))}

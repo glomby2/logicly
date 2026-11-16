@@ -1,5 +1,5 @@
 import { findComponent, getComponentPins, isPinConnected } from '@/core/circuit';
-import type { ElementRegistry } from '@/core/elements';
+import { switchProp, type ElementRegistry } from '@/core/elements';
 import { pinRefFromKey } from '@/core/simulation';
 import type { Circuit, CircuitComponent, PinRef, Wire } from '@/core/types/circuit';
 import type { PinDirection, PropSpec } from '@/core/types/element';
@@ -48,8 +48,10 @@ export type InspectorModel =
       readonly title: string;
       readonly description: string;
       readonly props: readonly PropSpec[];
-      /** Элемент переключается кликом (есть логическое свойство `value`). */
+      /** Элемент переключается кликом: роль внешнего входа (`switchProp`), как у INPUT. */
       readonly toggle: boolean;
+      /** Текущее положение переключателя (`false`, если элемент не переключается). */
+      readonly toggleOn: boolean;
       readonly pins: readonly PinRow[];
     }
   | { readonly kind: 'wire'; readonly wire: Wire; readonly from: PinEndpoint; readonly to: PinEndpoint }
@@ -146,6 +148,7 @@ export function buildInspectorModel(input: InspectorInput): InspectorModel {
   if (components.length === 1 && wires.length === 0) {
     const component = components[0]!;
     const definition = registry.get(component.type);
+    const toggleProp = switchProp(definition);
     return {
       kind: 'component',
       component,
@@ -153,7 +156,8 @@ export function buildInspectorModel(input: InspectorInput): InspectorModel {
       title: titleOf(registry, component.type),
       description: definition?.description ?? '',
       props: definition?.propSchema ?? [],
-      toggle: typeof component.props.value === 'boolean',
+      toggle: toggleProp !== undefined,
+      toggleOn: toggleProp !== undefined && component.props[toggleProp] === true,
       pins: pinRows(circuit, registry, component),
     };
   }

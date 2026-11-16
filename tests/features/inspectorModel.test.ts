@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { AND, createDefaultRegistry } from '@/core/elements';
+import { AND, BUILTIN_ELEMENTS, CODE_BITS_SPEC, CONSTANT, createDefaultRegistry, ElementRegistry } from '@/core/elements';
 import { pinRefFromKey } from '@/core/simulation';
 import { buildInspectorModel, componentName, type InspectorInput } from '@/features/inspector/inspectorModel';
 import { EMPTY_SELECTION } from '@/store';
 import { CircuitBuilder } from '../helpers/circuitBuilder';
+import { TEST_FLAG } from '../helpers/fixtureElements';
 
 const registry = createDefaultRegistry();
 
@@ -60,9 +61,36 @@ describe('buildInspectorModel', () => {
     ]);
   });
 
-  it('INPUT можно переключать; свойств в инспекторе нет', () => {
+  it('INPUT можно переключать; положение переключателя — из value; свойств в инспекторе нет', () => {
     const model = buildInspectorModel(input({ selection: { components: ['A'], wires: [] } }));
-    expect(model).toMatchObject({ kind: 'component', toggle: true, props: [] });
+    expect(model).toMatchObject({ kind: 'component', toggle: true, toggleOn: true, props: [] });
+    const off = { ...circuit(), components: circuit().components.map((c) => (c.id === 'A' ? { ...c, props: { value: false } } : c)) };
+    expect(buildInspectorModel(input({ circuit: off, selection: { components: ['A'], wires: [] } }))).toMatchObject({
+      toggle: true,
+      toggleOn: false,
+    });
+  });
+
+  it('DECODER и CONSTANT: свойства из propSchema, переключателя нет', () => {
+    const built = new CircuitBuilder().add('D', 'DECODER', { codeBits: 3 }).add('K', 'CONSTANT', { level: true }).build();
+    const of = (id: string) => buildInspectorModel(input({ circuit: built, selection: { components: [id], wires: [] } }));
+    expect(of('D')).toMatchObject({ kind: 'component', title: 'DECODER', props: [CODE_BITS_SPEC], toggle: false, toggleOn: false });
+    expect(of('K')).toMatchObject({ kind: 'component', title: 'CONSTANT', props: CONSTANT.propSchema, toggle: false, toggleOn: false });
+    const decoder = of('D');
+    if (decoder.kind !== 'component') throw new Error();
+    expect(decoder.pins.map((p) => p.id)).toEqual(['a0', 'a1', 'a2', 'y0', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6', 'y7']);
+  });
+
+  it('переключатель — только у роли внешнего входа: логическое value без port не переключается', () => {
+    const flagCircuit = new CircuitBuilder().add('F', 'TEST_FLAG', { value: true }).build();
+    const model = buildInspectorModel(
+      input({
+        circuit: flagCircuit,
+        registry: new ElementRegistry([...BUILTIN_ELEMENTS, TEST_FLAG]),
+        selection: { components: ['F'], wires: [] },
+      }),
+    );
+    expect(model).toMatchObject({ kind: 'component', toggle: false, toggleOn: false, props: TEST_FLAG.propSchema });
   });
 
   it('провод: откуда и куда', () => {
