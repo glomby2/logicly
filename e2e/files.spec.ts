@@ -83,6 +83,10 @@ test.describe('файлы', () => {
 
     await page.getByTestId('document-name').fill('Мой инвертор');
     await page.getByTestId('document-name').press('Enter');
+    // Уведомление скрывается само через 4 с; под нагрузкой это успевало случиться до проверки.
+    // Часы страницы остановлены: таймер автоскрытия сработает только по runFor ниже.
+    await page.clock.install();
+    await page.clock.pauseAt(Date.now() + 1000);
     const file = await saveVia(page, () => page.getByTestId('file-save').click());
 
     expect(file.fileName).toBe('Мой инвертор.lsim');
@@ -93,6 +97,8 @@ test.describe('файлы', () => {
     await expect(unsaved(page)).toHaveCount(0);
     await expect(page).toHaveTitle('Мой инвертор — Логический симулятор');
     await expect(notification(page)).toContainText('Мой инвертор.lsim');
+    await page.clock.runFor(4000);
+    await expect(notification(page)).toHaveCount(0);
   });
 
   test('Ctrl+S сохраняет, в том числе из поля названия с неподтверждённым текстом', async ({ page }) => {
